@@ -19,7 +19,7 @@ python run.py
 
 Open **http://127.0.0.1:8000**. On first start the database is created in `data/` and seeded with the demo organisation.
 
-**Sign in.** The sign-in page offers one-click **demo accounts** for all five demo people (Admin, two Creators, Manager, Approver). You can also sign in with email + password: every demo account (`asha@voltaro.demo`, `rohan@voltaro.demo`, `kavya@pixelkite.demo`, `meera@voltaro.demo`, `vikram@voltaro.demo`) uses the demo password `voltaro-demo`. Set `INKLOOM_DEMO_PASSWORD` to change it before the first start, or `INKLOOM_DEMO_LOGIN=0` to remove the one-click buttons. Sign out from the avatar / account menu.
+**Sign in.** The sign-in page offers one-click **demo accounts** for all five demo people (Admin, two Creators, Manager, Approver). You can also sign in with email + password: every demo account (`asha@voltaro.demo`, `rohan@voltaro.demo`, `kavya@pixelkite.demo`, `meera@voltaro.demo`, `vikram@voltaro.demo`) uses the demo password `voltaro-demo`. Set `INKLOOM_DEMO_PASSWORD` to change it before the first start, or `INKLOOM_DEMO_LOGIN=0` to remove the one-click buttons. Sign out from the avatar / account menu. Sessions are HMAC-signed cookies so they work across Vercel's multiple instances; set `INKLOOM_SESSION_SECRET` to a long random value in production (otherwise the key is derived from the AI key, or a dev-only key when none is set).
 
 **Enable AI review (optional, free option available):** copy `.env.example` to `.env` and pick a provider:
 
@@ -76,7 +76,7 @@ FastAPI (server/main.py) ── SQLite (data/inkloom.db) + local file store (dat
    ├─ scoring.py    transparent formula (below)
    ├─ integrity.py  SHA-256 approval seal, verification, word-level diff
    ├─ gaps.py       Guideline Gap Intelligence (repeated signatures across submissions)
-   ├─ auth.py       sign-in: PBKDF2-SHA256 passwords, hashed session tokens, lockout after 5 wrong tries
+   ├─ auth.py       sign-in: PBKDF2-SHA256 passwords, HMAC-signed stateless session cookie, lockout after 5 wrong tries
    ├─ learning.py   Feedback Learning: our own model trained on accept/reject decisions (shadow → active)
    └─ seed.py / demo_assets.py   fictional org + generated demo images/PDF
 ```

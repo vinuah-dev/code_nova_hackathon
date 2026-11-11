@@ -1,6 +1,7 @@
-"""Login sessions: PBKDF2 password hashes, random session tokens in an HttpOnly cookie.
+"""Login sessions: PBKDF2 password hashes and HMAC-signed session tokens in an HttpOnly cookie.
 
-Only the SHA-256 of a session token is stored, so a leaked database cannot be replayed as a login.
+Tokens are stateless (signed, with an expiry) because serverless hosts such as Vercel run several
+instances that do not share a database. Sign-out clears the cookie and revokes the token on that instance.
 The demo organisation also offers one-click "demo account" sign-in (INKLOOM_DEMO_LOGIN=0 turns it off).
 """
 import contextvars
@@ -9,7 +10,7 @@ import hmac
 import os
 import secrets
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 from . import db
 
@@ -50,26 +51,53 @@ def _th(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
 
 
+def _secret() -> bytes:
+    """HMAC key for session tokens. Must be identical on every server instance (Vercel runs several).
+
+    Order: INKLOOM_SESSION_SECRET (recommended) → derived from the configured AI key (already a shared
+    server-side secret; HMAC-derived so the key itself is never exposed) → fixed development key.
+    """
+    s = os.environ.get("INKLOOM_SESSION_SECRET")
+    if s:
+        return s.encode()
+    for k in ("GEMINI_API_KEY", "INKLOOM_AI_API_KEY", "ANTHROPIC_API_KEY"):
+        if os.environ.get(k):
+            return hmac.new(os.environ[k].encode(), b"inkloom-session-v1", hashlib.sha256).digest()
+    return b"inkloom-dev-only-session-key"  # local demo without any secret configured
+
+
+def _sign(payload: str) -> str:
+    return hmac.new(_secret(), payload.encode(), hashlib.sha256).hexdigest()
+
+
 def create_session(user_id: str) -> str:
-    token = secrets.token_urlsafe(32)
-    exp = (datetime.now(timezone.utc) + timedelta(days=SESSION_DAYS)).strftime("%Y-%m-%dT%H:%M:%SZ")
-    db.ex("INSERT INTO sessions(token_hash, user_id, created_at, expires_at) VALUES (?,?,?,?)", (_th(token), user_id, db.now(), exp))
-    db.ex("DELETE FROM sessions WHERE expires_at < ?", (db.now(),))
-    return token
+    """Stateless signed token 'user.expiry.nonce.signature', so any server instance can verify it."""
+    exp = int(time.time()) + SESSION_DAYS * 86400
+    payload = f"{user_id}.{exp}.{secrets.token_urlsafe(12)}"
+    return f"{payload}.{_sign(payload)}"
 
 
 def resolve(token: str | None) -> str | None:
-    if not token:
+    try:
+        uid, exp, nonce, sig = (token or "").split(".")
+    except ValueError:
         return None
-    s = db.one("SELECT user_id, expires_at FROM sessions WHERE token_hash=?", (_th(token),))
-    if not s or s["expires_at"] < db.now():
+    if not hmac.compare_digest(sig, _sign(f"{uid}.{exp}.{nonce}")):
         return None
-    return s["user_id"]
+    if not exp.isdigit() or int(exp) < time.time():
+        return None
+    if db.one("SELECT 1 FROM sessions WHERE token_hash=?", (_th(token),)):
+        return None  # signed out on this instance
+    return uid
 
 
 def end_session(token: str | None) -> None:
-    if token:
-        db.ex("DELETE FROM sessions WHERE token_hash=?", (_th(token),))
+    """Sign-out clears the cookie; the token is also put on this instance's revocation list."""
+    if resolve(token):
+        exp = datetime.fromtimestamp(int(token.split(".")[1]), timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        db.ex("INSERT OR IGNORE INTO sessions(token_hash, user_id, created_at, expires_at) VALUES (?,?,?,?)",
+              (_th(token), token.split(".")[0], db.now(), exp))
+        db.ex("DELETE FROM sessions WHERE expires_at < ?", (db.now(),))
 
 
 def check_password(email: str, password: str) -> dict | None:
