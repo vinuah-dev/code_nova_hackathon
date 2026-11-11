@@ -210,7 +210,8 @@ async function start() {
 
 let signingIn = false;
 window.addEventListener("inkloom:signed-out", async () => {
-  if (signingIn || document.body.classList.contains("signed-out")) return;
+  // Only for a session that ends mid-use; the first visit is handled by start().
+  if (!ctx.me || signingIn || document.body.classList.contains("signed-out")) return;
   signingIn = true;
   toast("Your session ended. Please sign in again.", "err");
   try { await signIn(); } finally { signingIn = false; }
