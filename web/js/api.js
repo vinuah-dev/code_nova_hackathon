@@ -1,15 +1,12 @@
-// Thin fetch wrapper. The selected demo user travels in X-User-Id; the server enforces roles.
-export const session = {
-  get userId() { try { return localStorage.getItem("inkloom.user") || "u-creator"; } catch { return "u-creator"; } },
-  set userId(v) { try { localStorage.setItem("inkloom.user", v); } catch { /* private mode */ } },
-};
+// Thin fetch wrapper. Identity travels in an HttpOnly session cookie; the server enforces roles.
 
 export async function api(path, { method = "GET", body } = {}) {
   let res;
   try {
     res = await fetch(path, {
       method,
-      headers: { "Content-Type": "application/json", "X-User-Id": session.userId },
+      headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
       body: body === undefined ? undefined : JSON.stringify(body),
     });
   } catch {
@@ -22,6 +19,8 @@ export async function api(path, { method = "GET", body } = {}) {
     const d = data && data.detail;
     const err = new Error(typeof d === "string" ? d : Array.isArray(d) ? d.map(x => x.msg).join("; ") : `Request failed (${res.status})`);
     err.status = res.status;
+    // Session expired or signed out elsewhere: send the user back to the sign-in screen.
+    if (res.status === 401 && !path.startsWith("/api/auth/")) window.dispatchEvent(new CustomEvent("inkloom:signed-out"));
     throw err;
   }
   return data;

@@ -35,7 +35,7 @@ export async function render(view, ctx) {
         <div class="card"><div class="card-h"><h2>${icon("users", "sm")} Roles & permissions</h2></div><div class="card-b" style="overflow-x:auto">
           <table class="t keep"><thead><tr><th>Action</th>${roles.map((r) => `<th>${r}</th>`).join("")}</tr></thead><tbody>
           ${Object.entries(s.permissions).map(([p, rs]) => `<tr><td>${PERM_LABEL[p] || p}</td>${roles.map((r) => `<td>${rs.includes(r) ? `<span style="color:var(--good)">✓</span>` : `<span class="muted">—</span>`}</td>`).join("")}</tr>`).join("")}
-          </tbody></table><p class="small muted">Demo users: switch identity from the top bar. Roles are enforced by the server, not just hidden in the UI.</p></div></div>
+          </tbody></table><p class="small muted">Each person signs in with their own account (top bar → Account). Roles are enforced by the server, not just hidden in the UI.</p></div></div>
         <div class="card"><div class="card-h"><h2>${icon("calculator", "sm")} Scoring model</h2></div><div class="card-b">
           <p><code>${esc(s.scoring.formula)}</code></p>
           <div class="row wrap">${Object.entries(s.scoring.penalties).map(([k, v]) => `${sevPill(k)} <span class="small">${v}</span>`).join("&nbsp;&nbsp;")}</div></div></div>

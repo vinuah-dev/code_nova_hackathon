@@ -19,6 +19,8 @@ python run.py
 
 Open **http://127.0.0.1:8000**. On first start the database is created in `data/` and seeded with the demo organisation.
 
+**Sign in.** The sign-in page offers one-click **demo accounts** for all five demo people (Admin, two Creators, Manager, Approver). You can also sign in with email + password: every demo account (`asha@voltaro.demo`, `rohan@voltaro.demo`, `kavya@pixelkite.demo`, `meera@voltaro.demo`, `vikram@voltaro.demo`) uses the demo password `voltaro-demo`. Set `INKLOOM_DEMO_PASSWORD` to change it before the first start, or `INKLOOM_DEMO_LOGIN=0` to remove the one-click buttons. Sign out from the avatar / account menu.
+
 **Enable AI review (optional, free option available):** copy `.env.example` to `.env` and pick a provider:
 
 | Provider | Cost | Set in `.env` |
@@ -36,13 +38,13 @@ On Vercel, add the same variables under Project → Settings → Environment Var
 python scripts/smoke_test.py
 ```
 
-It runs 34 checks covering upload → review → fixes → approval → integrity → gap intelligence → analytics. `python scripts/mock_ai_test.py` runs 11 more against a local mock of an OpenAI-compatible AI server (request format, image input, grounding validation, fallback on 429). `python scripts/learning_test.py` runs 14 checks on the feedback-learning model (shadow mode, quality gate, activation, admin pin).
+It runs 34 checks covering upload → review → fixes → approval → integrity → gap intelligence → analytics. `python scripts/mock_ai_test.py` runs 11 more against a local mock of an OpenAI-compatible AI server (request format, image input, grounding validation, fallback on 429). `python scripts/auth_test.py` runs 20 sign-in/sign-out checks with real cookies. `python scripts/learning_test.py` runs 14 checks on the feedback-learning model (shadow mode, quality gate, activation, admin pin).
 
 ---
 
 ## Demo script (≈ 6 minutes)
 
-Switch user from the top-right selector. Roles are enforced by the server.
+Switch person from the account menu (top right, or the avatar on mobile). Roles are enforced by the server.
 
 | # | As | Do |
 |---|----|----|
@@ -64,7 +66,7 @@ Switch user from the top-right selector. Roles are enforced by the server.
 
 ```
 Browser (vanilla JS SPA, no build step)
-   │  JSON over HTTP, X-User-Id header (demo identity; roles enforced server-side)
+   │  JSON over HTTP, HttpOnly session cookie (sign-in; roles enforced server-side)
 FastAPI (server/main.py) ── SQLite (data/inkloom.db) + local file store (data/uploads)
    ├─ rag.py        Brand Brain → chunks with stable ids → BM25 retrieval
    ├─ rules.py      deterministic checks (text + images) → findings with exact offsets
@@ -74,6 +76,7 @@ FastAPI (server/main.py) ── SQLite (data/inkloom.db) + local file store (dat
    ├─ scoring.py    transparent formula (below)
    ├─ integrity.py  SHA-256 approval seal, verification, word-level diff
    ├─ gaps.py       Guideline Gap Intelligence (repeated signatures across submissions)
+   ├─ auth.py       sign-in: PBKDF2-SHA256 passwords, hashed session tokens, lockout after 5 wrong tries
    ├─ learning.py   Feedback Learning: our own model trained on accept/reject decisions (shadow → active)
    └─ seed.py / demo_assets.py   fictional org + generated demo images/PDF
 ```
@@ -119,7 +122,7 @@ No templates or boilerplate were used. Demo images and the brand-book PDF are ge
 
 - Image checks are heuristic. Palette contrast uses the two dominant colours, not OCR'd text. The logo check compares the logo file the creator declares; it does not locate the logo inside a poster (Claude's vision covers that when enabled).
 - Rule-based rewrites are simple substitutions; better rewrites come from Claude when enabled.
-- Demo identity uses a user switcher, not real authentication. Production needs SSO and per-tenant isolation.
+- Sign-in is email + password with server-side sessions, but there is no self-service sign-up, password reset or SSO, and the one-click demo accounts must be turned off (`INKLOOM_DEMO_LOGIN=0`) for any real use. Production also needs per-tenant isolation. The failed-login lockout is per server instance (in memory).
 - The integrity hash lives in the same database. Production should anchor it externally (e.g. a signed log).
 - The Gemini path has been run live (free tier, `gemini-3.5-flash`); the Anthropic path has not been exercised with a live key in this build. Model names on free tiers change often, so override `INKLOOM_MODEL` if a provider rejects the default.
 - The feedback-learning model is small and only as good as the decisions it gets. Its demo metrics come mostly from **simulated** seed feedback, so they show the mechanism, not real-world accuracy. On Vercel the database lives in `/tmp`, so decisions (and the model) reset when the instance restarts.

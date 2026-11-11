@@ -11,6 +11,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
+os.environ["INKLOOM_HEADER_AUTH"] = "1"  # test-only: act as users via X-User-Id
 os.environ["INKLOOM_DATA_DIR"] = tempfile.mkdtemp(prefix="inkloom_test_")
 os.environ.setdefault("INKLOOM_TEST_NO_AI", "1")
 if os.environ["INKLOOM_TEST_NO_AI"] == "1":
@@ -40,7 +41,7 @@ def b64(p: Path) -> str:
     return base64.b64encode(p.read_bytes()).decode()
 
 
-with TestClient(app) as c:
+with TestClient(app, headers={"X-User-Id": "u-creator"}) as c:
     st = c.get("/api/status").json()
     check("ai_configured" in st, f"status endpoint (AI configured: {st['ai_configured']})")
     brand = c.get("/api/brand").json()

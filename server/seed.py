@@ -5,10 +5,16 @@ Seeded submissions are analysed by the real rule engine at setup time (no AI cal
 so their findings and scores are genuine outputs of the product, not hard-coded.
 """
 import hashlib
+import os
 import shutil
 
-from . import analysis, db, demo_assets, integrity, learning
+from . import analysis, auth, db, demo_assets, integrity, learning
 from .config import UPLOAD_DIR, WEB_DIR
+
+# Demo sign-in: every demo account uses this password unless INKLOOM_DEMO_PASSWORD is set.
+DEMO_PASSWORD = os.environ.get("INKLOOM_DEMO_PASSWORD", "voltaro-demo")
+EMAILS = {"u-admin": "asha@voltaro.demo", "u-creator": "rohan@voltaro.demo", "u-agency": "kavya@pixelkite.demo",
+          "u-manager": "meera@voltaro.demo", "u-approver": "vikram@voltaro.demo"}
 
 USERS = [
     ("u-admin", "Asha Rao", "admin", "Brand Lead (Admin)"),
@@ -183,6 +189,13 @@ def _seed_feedback() -> None:
                   (cid, actor, action, frm, to, note, ts))
 
 
+def set_demo_credentials() -> None:
+    for uid, email in EMAILS.items():
+        u = db.one("SELECT password_hash FROM users WHERE id=?", (uid,))
+        if u and not u["password_hash"]:
+            db.ex("UPDATE users SET email=?, password_hash=? WHERE id=?", (email, auth.hash_password(DEMO_PASSWORD), uid))
+
+
 def _add_asset(src, name, kind="logo"):
     dest = UPLOAD_DIR / f"brand_{src.name}"
     shutil.copy(src, dest)
@@ -195,6 +208,7 @@ def seed() -> None:
     db.conn()
     for u in USERS:
         db.ex("INSERT INTO users(id, name, role, title) VALUES (?,?,?,?)", u)
+    set_demo_credentials()
     for gid, cat, title, body in GUIDELINES:
         db.ex("INSERT INTO guidelines(id, category, title, body, version, source, updated_at) VALUES (?,?,?,?,1,?,?)",
               (gid, cat, title, body, "Voltaro Brand Guidelines v3 (seed)", db.now()))

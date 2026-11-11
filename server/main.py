@@ -9,12 +9,12 @@ import uuid
 from collections import Counter, defaultdict
 from pathlib import Path
 
-from fastapi import Body, FastAPI, Header, HTTPException
+from fastapi import Body, FastAPI, Header, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
 
-from . import analysis, config, db, gaps, integrity, learning, rag, scoring, visual
+from . import analysis, auth, config, db, gaps, integrity, learning, rag, scoring, visual
 from .config import UPLOAD_DIR, WEB_DIR
 
 config.load_env()
@@ -53,24 +53,99 @@ def ensure_ready() -> None:
             if not db.one("SELECT id FROM users LIMIT 1"):
                 from . import seed
                 seed.seed()
+            if db.one("SELECT id FROM users WHERE password_hash IS NULL LIMIT 1"):
+                from . import seed
+                seed.set_demo_credentials()
             if not db.one("SELECT id FROM ml_models LIMIT 1"):
                 learning.train()  # existing databases from before feedback learning
             _ready = True
 
 
+PUBLIC_API = {"/api/status", "/api/auth/login", "/api/auth/demo-login", "/api/auth/demo-accounts", "/api/auth/logout"}
+
+
 @app.middleware("http")
-async def _ready_mw(request, call_next):
-    if request.url.path.startswith("/api/"):
-        await run_in_threadpool(ensure_ready)
-    return await call_next(request)
+async def _auth_mw(request, call_next):
+    path = request.url.path
+    if not path.startswith("/api/"):
+        res = await call_next(request)
+        if path.endswith((".js", ".css", ".html")) or path == "/":
+            res.headers["Cache-Control"] = "no-cache"  # always revalidate, so a new deploy is picked up at once
+        return res
+    await run_in_threadpool(ensure_ready)
+    uid = await run_in_threadpool(auth.resolve, request.cookies.get(auth.COOKIE))
+    if not uid and auth.header_auth_enabled():
+        uid = request.headers.get("x-user-id")
+    if not uid and path not in PUBLIC_API:
+        return JSONResponse(status_code=401, content={"detail": "Please sign in."})
+    tok = auth.current_user_id.set(uid)
+    try:
+        return await call_next(request)
+    finally:
+        auth.current_user_id.reset(tok)
 
 
 # ---------------------------------------------------------------- helpers
-def user(x_user_id: str | None) -> dict:
-    u = db.one("SELECT * FROM users WHERE id=?", (x_user_id or "",))
+def user(_header: str | None = None) -> dict:
+    """The signed-in user (from the session cookie). The old X-User-Id argument is ignored."""
+    u = db.one("SELECT * FROM users WHERE id=?", (auth.current_user_id.get() or "",))
     if not u:
-        raise HTTPException(401, "Pick a user (role) in the top bar")
+        raise HTTPException(401, "Please sign in.")
     return u
+
+
+# ---------------------------------------------------------------- auth
+def _login_response(request: Request, u: dict) -> JSONResponse:
+    token = auth.create_session(u["id"])
+    res = JSONResponse({"user": auth.public(u)})
+    secure = request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https"
+    res.set_cookie(auth.COOKIE, token, max_age=auth.SESSION_DAYS * 86400, httponly=True, samesite="lax", secure=secure, path="/")
+    return res
+
+
+@app.post("/api/auth/login")
+def login(request: Request, data: dict = Body(...)):
+    email, pw = (data.get("email") or "").strip(), data.get("password") or ""
+    if not email or not pw:
+        raise HTTPException(400, "Enter your email and password.")
+    try:
+        u = auth.check_password(email, pw)
+    except PermissionError as e:
+        raise HTTPException(429, str(e))
+    if not u:
+        raise HTTPException(401, "Email or password is incorrect.")
+    return _login_response(request, u)
+
+
+@app.get("/api/auth/demo-accounts")
+def demo_accounts():
+    if not auth.demo_login_enabled():
+        return {"enabled": False, "accounts": []}
+    rows = db.q("SELECT * FROM users WHERE email IS NOT NULL ORDER BY CASE role WHEN 'admin' THEN 0 WHEN 'creator' THEN 1 WHEN 'manager' THEN 2 ELSE 3 END")
+    return {"enabled": True, "accounts": [auth.public(u) for u in rows]}
+
+
+@app.post("/api/auth/demo-login")
+def demo_login(request: Request, data: dict = Body(...)):
+    if not auth.demo_login_enabled():
+        raise HTTPException(403, "Demo sign-in is turned off.")
+    u = db.one("SELECT * FROM users WHERE id=?", (data.get("user_id") or "",))
+    if not u:
+        raise HTTPException(404, "Unknown demo account")
+    return _login_response(request, u)
+
+
+@app.get("/api/auth/me")
+def me():
+    return {"user": auth.public(user()), "demo_login": auth.demo_login_enabled()}
+
+
+@app.post("/api/auth/logout")
+def logout(request: Request):
+    auth.end_session(request.cookies.get(auth.COOKIE))
+    res = JSONResponse({"ok": True})
+    res.delete_cookie(auth.COOKIE, path="/")
+    return res
 
 
 def need(u: dict, perm: str) -> None:
@@ -146,7 +221,7 @@ def status():
 
 @app.get("/api/users")
 def users():
-    return db.q("SELECT * FROM users ORDER BY CASE role WHEN 'admin' THEN 0 WHEN 'creator' THEN 1 WHEN 'manager' THEN 2 ELSE 3 END")
+    return db.q("SELECT id, name, role, title, email FROM users ORDER BY CASE role WHEN 'admin' THEN 0 WHEN 'creator' THEN 1 WHEN 'manager' THEN 2 ELSE 3 END")
 
 
 # ---------------------------------------------------------------- Brand Brain
@@ -745,12 +820,14 @@ def analytics():
 
 
 @app.post("/api/admin/reset-demo")
-def reset_demo(x_user_id: str | None = Header(None)):
-    need(user(x_user_id), "brand")
+def reset_demo(request: Request, x_user_id: str | None = Header(None)):
+    u = user(x_user_id)
+    need(u, "brand")
     from . import seed
     db.reset_all()
     seed.seed()
-    return {"ok": True}
+    # Sessions were wiped with the data; keep the admin who pressed the button signed in.
+    return _login_response(request, db.one("SELECT * FROM users WHERE id=?", (u["id"],)))
 
 
 @app.exception_handler(Exception)

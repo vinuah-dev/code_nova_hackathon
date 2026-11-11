@@ -55,6 +55,7 @@ os.environ.update({"INKLOOM_DATA_DIR": tempfile.mkdtemp(prefix="inkloom_mock_"),
                    "INKLOOM_AI_BASE_URL": f"http://127.0.0.1:{srv.server_port}", "INKLOOM_AI_API_KEY": "test-key",
                    "INKLOOM_MODEL": "mock-model"})
 os.environ.pop("INKLOOM_DISABLE_AI", None)
+os.environ["INKLOOM_HEADER_AUTH"] = "1"  # test-only: act as users via X-User-Id
 
 from fastapi.testclient import TestClient  # noqa: E402
 

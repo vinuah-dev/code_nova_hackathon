@@ -9,6 +9,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
+os.environ["INKLOOM_HEADER_AUTH"] = "1"  # test-only: act as users via X-User-Id
 os.environ["INKLOOM_DATA_DIR"] = tempfile.mkdtemp(prefix="inkloom_learn_")
 os.environ["INKLOOM_DISABLE_AI"] = "1"
 
@@ -39,7 +40,7 @@ POSTS = [
     "New helmets for the VoltaroGlide S1 are in stores this week, and our accessory team designed them with extra ventilation for summer rides so that commuters stay cool and comfortable in the heat. Enjoy!",
 ]
 
-with TestClient(app) as c:
+with TestClient(app, headers={"X-User-Id": "u-creator"}) as c:
     s = c.get("/api/learning").json()
     m = s["model"]
     check(m is not None and m["info"]["seeded"] > 0 and m["info"]["real"] == 0, f"model trained on seeded demo feedback ({m['info']['n']} decisions)")

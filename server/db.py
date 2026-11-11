@@ -11,7 +11,10 @@ _conn: sqlite3.Connection | None = None
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS users (
-  id TEXT PRIMARY KEY, name TEXT NOT NULL, role TEXT NOT NULL, title TEXT
+  id TEXT PRIMARY KEY, name TEXT NOT NULL, role TEXT NOT NULL, title TEXT, email TEXT, password_hash TEXT
+);
+CREATE TABLE IF NOT EXISTS sessions (
+  token_hash TEXT PRIMARY KEY, user_id TEXT, created_at TEXT, expires_at TEXT
 );
 CREATE TABLE IF NOT EXISTS guidelines (
   id TEXT PRIMARY KEY, category TEXT NOT NULL, title TEXT NOT NULL, body TEXT NOT NULL,
@@ -107,6 +110,11 @@ def conn() -> sqlite3.Connection:
         _conn.row_factory = sqlite3.Row
         _conn.execute("PRAGMA foreign_keys = ON")
         _conn.executescript(SCHEMA)
+        cols = {r[1] for r in _conn.execute("PRAGMA table_info(users)")}
+        for col in ("email", "password_hash"):  # databases created before login existed
+            if col not in cols:
+                _conn.execute(f"ALTER TABLE users ADD COLUMN {col} TEXT")
+        _conn.commit()
     return _conn
 
 

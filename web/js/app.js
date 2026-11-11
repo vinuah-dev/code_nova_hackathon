@@ -1,6 +1,7 @@
-import { api, session } from "./api.js";
+import { api } from "./api.js";
 import { $, $$, esc, icon, icons, initials, toast } from "./ui.js";
 import { animateIn, isMobile, sheet } from "./motion.js";
+import { showLogin } from "./login.js";
 
 const NAV = [
   ["dashboard", "Dashboard", "layout-dashboard", "#/"],
@@ -33,15 +34,14 @@ const ROUTES = [
   [/^\/settings$/, "settings", "settings"],
 ];
 
-export const ctx = { users: [], me: null, status: null, pending: 0, nav: "dashboard" };
+export const ctx = { users: [], me: null, status: null, pending: 0, nav: "dashboard", demoLogin: false };
 
 async function loadShell() {
-  [ctx.users, ctx.status] = await Promise.all([api("/api/users"), api("/api/status")]);
-  if (!ctx.users.find((u) => u.id === session.userId)) session.userId = "u-creator";
-  ctx.me = ctx.users.find((u) => u.id === session.userId);
-  const sel = $("#user-select");
-  sel.innerHTML = ctx.users.map((u) => `<option value="${u.id}" ${u.id === ctx.me.id ? "selected" : ""}>${esc(u.name)} — ${esc(u.title)}</option>`).join("");
-  sel.onchange = () => switchUser(sel.value);
+  const [me, users, status] = await Promise.all([api("/api/auth/me"), api("/api/users"), api("/api/status")]);
+  ctx.me = me.user;
+  ctx.demoLogin = me.demo_login;
+  ctx.users = users;
+  ctx.status = status;
   paintMe();
   const ai = ctx.status.ai_configured;
   $("#ai-pill").innerHTML = ai
@@ -51,16 +51,25 @@ async function loadShell() {
     <div style="margin-top:4px">${ai ? `${esc(ctx.status.provider_label)} · <code>${esc(ctx.status.model)}</code>. Confidential content is never sent.` : "Deterministic checks only. Add an AI key in <code>.env</code> (free Gemini key works) to enable AI review."}</div>`;
   $("#m-ai").className = `dot ${ai ? "on" : "off"}`;
   $("#m-avatar").onclick = openMeSheet;
-  window.addEventListener("resize", () => moveIndicator(), { passive: true });
+  $("#me-btn").onclick = openMeSheet;
 }
 
-function switchUser(id) {
-  session.userId = id;
-  ctx.me = ctx.users.find((u) => u.id === id);
-  $("#user-select").value = id;
-  paintMe();
-  toast(`Now acting as ${ctx.me.name} (${ctx.me.role})`);
-  route();
+async function switchUser(id) {
+  try {
+    const r = await api("/api/auth/demo-login", { method: "POST", body: { user_id: id } });
+    ctx.me = r.user;
+    paintMe();
+    toast(`Signed in as ${ctx.me.name} (${ctx.me.role})`);
+    route();
+  } catch (e) { toast(e.message, "err"); }
+}
+
+async function logout() {
+  try { await api("/api/auth/logout", { method: "POST" }); } catch { /* cookie is cleared anyway */ }
+  ctx.me = null;
+  lastPath = null;
+  toast("You have been signed out", "ok");
+  await signIn();
 }
 
 function paintMe() {
@@ -73,14 +82,22 @@ function paintMe() {
 }
 
 function openMeSheet() {
-  const ai = ctx.status.ai_configured;
+  const ai = ctx.status.ai_configured, me = ctx.me;
   sheet({
-    title: "Switch user",
-    body: `<div class="banner ${ai ? "info" : "warn"}" style="margin-bottom:12px">${icon(ai ? "sparkles" : "cpu", "sm")}<div>${ai ? `AI review on · ${esc(ctx.status.provider_label)} <code>${esc(ctx.status.model)}</code>` : "Rule engine mode (no AI key)"}</div></div>
-      <div class="user-list">${ctx.users.map((u) => `<button class="user-row ${u.id === ctx.me.id ? "on" : ""}" data-u="${u.id}">
+    title: "Account",
+    body: `<div class="acct-head"><div class="avatar ${esc(me.role)}">${initials(me.name)}</div>
+        <div class="who"><b>${esc(me.name)}</b><span>${esc(me.email || "")}</span><span>${esc(me.title)}</span></div></div>
+      <div class="banner ${ai ? "info" : "warn"}" style="margin-bottom:12px">${icon(ai ? "sparkles" : "cpu", "sm")}<div>${ai ? `AI review on · ${esc(ctx.status.provider_label)} <code>${esc(ctx.status.model)}</code>` : "Rule engine mode (no AI key)"}</div></div>
+      ${ctx.demoLogin ? `<div class="section-lbl" style="margin:6px 0 8px">Switch demo account</div>
+      <div class="user-list">${ctx.users.filter((u) => u.email).map((u) => `<button class="user-row ${u.id === me.id ? "on" : ""}" data-u="${u.id}">
         <div class="avatar ${u.role}">${initials(u.name)}</div><div class="who"><b>${esc(u.name)}</b><span>${esc(u.title)}</span></div>
-        ${u.id === ctx.me.id ? icon("check", "sm right") : ""}</button>`).join("")}</div>`,
-    onClick: (e, close) => { const b = e.target.closest("[data-u]"); if (b) { close(); switchUser(b.dataset.u); } },
+        ${u.id === me.id ? icon("check", "sm right") : ""}</button>`).join("")}</div>` : ""}
+      <button class="btn danger logout-btn" data-logout>${icon("log-out", "sm")} Sign out</button>`,
+    onClick: (e, close) => {
+      if (e.target.closest("[data-logout]")) { close(); logout(); return; }
+      const b = e.target.closest("[data-u]");
+      if (b && b.dataset.u !== me.id) { close(); switchUser(b.dataset.u); }
+    },
   });
 }
 
@@ -171,8 +188,33 @@ export function crumbs(html) {
   if (last && isMobile()) $("#m-title").textContent = last.textContent;
 }
 
-window.addEventListener("hashchange", route);
-loadShell().then(route).catch((e) => {
-  $("#view").innerHTML = `<div class="banner bad">${icon("plug-zap", "sm")}<div><b>Cannot load Inkloom.</b> ${esc(e.message)}</div></div>`;
-  icons();
+async function signIn() {
+  await showLogin();
+  await start();
+}
+
+async function start() {
+  try {
+    await loadShell();
+  } catch (e) {
+    if (e.status === 401) return signIn();
+    document.body.classList.remove("booting");
+    $("#view").innerHTML = `<div class="banner bad">${icon("plug-zap", "sm")}<div><b>Cannot load Inkloom.</b> ${esc(e.message)}</div></div>`;
+    icons();
+    return;
+  }
+  document.body.classList.remove("booting");
+  lastPath = null;
+  route();
+}
+
+let signingIn = false;
+window.addEventListener("inkloom:signed-out", async () => {
+  if (signingIn || document.body.classList.contains("signed-out")) return;
+  signingIn = true;
+  toast("Your session ended. Please sign in again.", "err");
+  try { await signIn(); } finally { signingIn = false; }
 });
+window.addEventListener("hashchange", () => { if (ctx.me) route(); });
+window.addEventListener("resize", () => moveIndicator(), { passive: true });
+start();

@@ -60,7 +60,8 @@ svg.lucide { width: 18px; height: 18px; stroke-width: 1.8; flex: none; }
 .topbar .crumbs b { color: var(--ink); font-weight: 600; }
 .topbar .spacer { flex: 1; }
 .role-switch { display: flex; align-items: center; gap: 10px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 5px 10px 5px 6px; cursor: pointer; position: relative; }
-.role-switch select { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.role-switch { font: inherit; color: inherit; text-align: left; }
+.role-switch:hover { border-color: #CBD0E0; }
 .avatar { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; font-weight: 700; font-size: 12px; color: #fff; background: linear-gradient(135deg, #6366F1, #8B5CF6); flex: none; }
 .avatar.creator { background: linear-gradient(135deg, #0EA5E9, #6366F1); }
 .avatar.manager { background: linear-gradient(135deg, #14B8A6, #0EA5E9); }

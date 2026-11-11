@@ -23,7 +23,7 @@ export async function render(view, ctx, params) {
 function renderNew(view, ctx, can) {
   files = [];
   if (!can) {
-    view.innerHTML = `<div class="banner warn">${icon("lock", "sm")}<div>Your role (${ctx.me.role}) cannot create content. Switch to a Creator in the top bar.</div></div>`;
+    view.innerHTML = `<div class="banner warn">${icon("lock", "sm")}<div>Your role (${ctx.me.role}) cannot create content. Sign in as a Creator (top bar → Account).</div></div>`;
     return;
   }
   view.innerHTML = `
