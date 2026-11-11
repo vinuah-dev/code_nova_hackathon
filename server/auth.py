@@ -95,7 +95,7 @@ def end_session(token: str | None) -> None:
     """Sign-out clears the cookie; the token is also put on this instance's revocation list."""
     if resolve(token):
         exp = datetime.fromtimestamp(int(token.split(".")[1]), timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-        db.ex("INSERT OR IGNORE INTO sessions(token_hash, user_id, created_at, expires_at) VALUES (?,?,?,?)",
+        db.ex("INSERT INTO sessions(token_hash, user_id, created_at, expires_at) VALUES (?,?,?,?) ON CONFLICT DO NOTHING",
               (_th(token), token.split(".")[0], db.now(), exp))
         db.ex("DELETE FROM sessions WHERE expires_at < ?", (db.now(),))
 

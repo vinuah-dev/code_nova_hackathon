@@ -4,3 +4,4 @@ anthropic>=2.8
 pypdf>=4.0
 pillow>=10.0
 numpy>=1.26
+psycopg[binary]>=3.2

@@ -13,6 +13,8 @@ os.environ["INKLOOM_DATA_DIR"] = tempfile.mkdtemp(prefix="inkloom_auth_")
 os.environ["INKLOOM_DISABLE_AI"] = "1"
 os.environ.pop("INKLOOM_HEADER_AUTH", None)
 
+os.environ["INKLOOM_DB"] = "sqlite"  # never touch a configured Postgres/Supabase
+
 from fastapi.testclient import TestClient  # noqa: E402
 
 from server import auth, db  # noqa: E402

@@ -73,7 +73,8 @@ def _client():
 
 
 def _image_block(path: str) -> dict:
-    img = Image.open(path).convert("RGB")
+    from . import storage
+    img = Image.open(storage.local(path) or path).convert("RGB")
     img.thumbnail((1400, 1400))
     buf = io.BytesIO()
     img.save(buf, format="PNG")

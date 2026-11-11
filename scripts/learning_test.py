@@ -13,6 +13,8 @@ os.environ["INKLOOM_HEADER_AUTH"] = "1"  # test-only: act as users via X-User-Id
 os.environ["INKLOOM_DATA_DIR"] = tempfile.mkdtemp(prefix="inkloom_learn_")
 os.environ["INKLOOM_DISABLE_AI"] = "1"
 
+os.environ["INKLOOM_DB"] = "sqlite"  # never touch a configured Postgres/Supabase
+
 from fastapi.testclient import TestClient  # noqa: E402
 
 from server import learning  # noqa: E402

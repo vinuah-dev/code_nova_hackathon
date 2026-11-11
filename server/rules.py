@@ -7,7 +7,7 @@ so the report is explainable and reproducible.
 import re
 from datetime import date
 
-from . import db, visual
+from . import db, storage, visual
 
 ALLOWED_CAPS = {"EV", "IP67", "ARAI", "IDC", "BIS", "USB", "LED", "GPS", "KM", "T&C", "FAQ", "AI", "OTA", "ABS", "CBS", "EMI", "GST", "INR"}
 
@@ -231,7 +231,7 @@ def check_images(uploads: list[dict], alt_text: str, b: Builder) -> None:
 
     for u in posters:
         meta = db.pj(u.get("meta"), {}) or {}
-        pal = meta.get("palette") or visual.palette(u["path"])
+        pal = meta.get("palette") or visual.palette(storage.local(u["path"]) or u["path"])
         for issue in visual.check_palette(pal, brand_colors):
             b.add(category="visual", severity="high" if issue["share"] > 0.15 else "medium",
                   title="Unapproved brand colour", quote=issue["hex"], target=f"image:{u['id']}",
@@ -254,7 +254,7 @@ def check_images(uploads: list[dict], alt_text: str, b: Builder) -> None:
         for u in [x for x in images if x["kind"] == "logo"]:
             best = None
             for lg in logos:
-                r = visual.compare_logo(u["path"], lg["path"])
+                r = visual.compare_logo(storage.local(u["path"]) or u["path"], storage.local(lg["path"]) or lg["path"])
                 if best is None or r["shape_similarity"] > best[1]["shape_similarity"]:
                     best = (lg, r)
             lg, r = best

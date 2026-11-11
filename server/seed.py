@@ -8,7 +8,7 @@ import hashlib
 import os
 import shutil
 
-from . import analysis, auth, db, demo_assets, integrity, learning
+from . import analysis, auth, db, demo_assets, integrity, learning, storage
 from .config import UPLOAD_DIR, WEB_DIR
 
 # Demo sign-in: every demo account uses this password unless INKLOOM_DEMO_PASSWORD is set.
@@ -199,6 +199,7 @@ def set_demo_credentials() -> None:
 def _add_asset(src, name, kind="logo"):
     dest = UPLOAD_DIR / f"brand_{src.name}"
     shutil.copy(src, dest)
+    storage.save_file(dest, "image/png")
     from . import visual
     return db.ex("INSERT INTO assets(kind, name, path, mime, meta, created_at) VALUES (?,?,?,?,?,?)",
                  (kind, name, str(dest), "image/png", db.j({"palette": visual.palette(dest)}), db.now()))

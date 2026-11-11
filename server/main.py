@@ -14,7 +14,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
 
-from . import analysis, auth, config, db, gaps, integrity, learning, rag, scoring, visual
+from . import analysis, auth, config, db, gaps, integrity, learning, rag, scoring, storage, visual
 from .config import UPLOAD_DIR, WEB_DIR
 
 config.load_env()
@@ -49,10 +49,10 @@ def ensure_ready() -> None:
         return
     with _ready_lock:
         if not _ready:
-            db.conn()
-            if not db.one("SELECT id FROM users LIMIT 1"):
-                from . import seed
-                seed.seed()
+            with db.global_lock():  # Postgres: only one cold-starting instance seeds
+                if not db.one("SELECT id FROM users LIMIT 1"):
+                    from . import seed
+                    seed.seed()
             if db.one("SELECT id FROM users WHERE password_hash IS NULL LIMIT 1"):
                 from . import seed
                 seed.set_demo_credentials()
@@ -202,6 +202,7 @@ def save_upload(name: str, mime: str, data_b64: str, kind: str) -> dict:
         except Exception:
             path.unlink(missing_ok=True)
             raise HTTPException(400, "Could not read image")
+    storage.save(path, raw, mime)  # also kept in the database when one is configured
     uid = db.ex("INSERT INTO uploads(kind, name, path, mime, sha256, text, meta, created_at) VALUES (?,?,?,?,?,?,?,?)",
                 (kind, name, str(path), mime, hashlib.sha256(raw).hexdigest(), text, db.j(meta), db.now()))
     return public_upload(db.one("SELECT * FROM uploads WHERE id=?", (uid,)))
@@ -362,17 +363,19 @@ def delete_brand_item(kind: str, item_id: str, x_user_id: str | None = Header(No
 @app.get("/api/files/upload/{uid}")
 def file_upload(uid: int):
     u = db.one("SELECT path, mime FROM uploads WHERE id=?", (uid,))
-    if not u or not Path(u["path"]).exists():
+    p = storage.local(u["path"]) if u else None
+    if not p:
         raise HTTPException(404)
-    return FileResponse(u["path"], media_type=u["mime"])
+    return FileResponse(p, media_type=u["mime"])
 
 
 @app.get("/api/files/asset/{aid}")
 def file_asset(aid: int):
     a = db.one("SELECT path, mime FROM assets WHERE id=?", (aid,))
-    if not a or not Path(a["path"]).exists():
+    p = storage.local(a["path"]) if a else None
+    if not p:
         raise HTTPException(404)
-    return FileResponse(a["path"], media_type=a["mime"])
+    return FileResponse(p, media_type=a["mime"])
 
 
 @app.post("/api/uploads")
@@ -803,7 +806,7 @@ def analytics():
     high_risk = [{"id": cid, "title": next(c["title"] for c in contents if c["id"] == cid), "score": a["score"],
                   "critical": sum(1 for f in a["findings"] if f["severity"] == "critical" and f.get("decision") != "rejected")}
                  for cid, a in latest.items() if a["score"] < 60 or any(f["severity"] == "critical" and f.get("decision") != "rejected" for f in a["findings"])]
-    trend = db.q("SELECT substr(created_at,1,10) AS day, ROUND(AVG(score),1) AS avg, COUNT(*) AS n FROM analyses GROUP BY day ORDER BY day")
+    trend = db.q("SELECT substr(created_at,1,10) AS day, ROUND(CAST(AVG(score) AS NUMERIC), 1) AS avg, COUNT(*) AS n FROM analyses GROUP BY day ORDER BY day")
     status_counts = Counter(c["status"] for c in contents)
     return {
         "overall_score": round(sum(a["score"] for a in latest.values()) / len(latest), 1) if latest else None,

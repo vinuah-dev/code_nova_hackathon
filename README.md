@@ -32,6 +32,8 @@ Open **http://127.0.0.1:8000**. On first start the database is created in `data/
 
 On Vercel, add the same variables under Project → Settings → Environment Variables and redeploy. Without any key the app runs in **Rule engine mode**: every deterministic check still runs and the UI labels the report as rule-engine only. This is also the automatic fallback if the AI service fails or hits a free-tier rate limit.
 
+**Shared database (Supabase / any Postgres, optional):** set `DATABASE_URL` to a Postgres connection string and the app uses it instead of SQLite. Tables are created automatically, the demo organisation is seeded once (an advisory lock stops two cold starts seeding twice) and uploaded files are stored in a `blobs` table, so every Vercel instance sees the same data. For Supabase use the **Session pooler** string from *Connect* (port 5432, IPv4) and percent-encode special characters in the password (`@` → `%40`). Row Level Security is switched on for every table, which blocks Supabase's public REST Data API; the app itself connects as the table owner. Put the Vercel functions in the same region as the database (`vercel.json` → `regions`; this repo uses `syd1` for a Sydney project). Without `DATABASE_URL` (or with `INKLOOM_DB=sqlite`) the app uses the local SQLite file.
+
 **Test the whole journey (no API key needed, uses a throwaway database):**
 
 ```bash
@@ -67,7 +69,7 @@ Switch person from the account menu (top right, or the avatar on mobile). Roles 
 ```
 Browser (vanilla JS SPA, no build step)
    │  JSON over HTTP, HttpOnly session cookie (sign-in; roles enforced server-side)
-FastAPI (server/main.py) ── SQLite (data/inkloom.db) + local file store (data/uploads)
+FastAPI (server/main.py) ── SQLite (data/inkloom.db) or Postgres/Supabase (DATABASE_URL) + file store (local, mirrored to the DB)
    ├─ rag.py        Brand Brain → chunks with stable ids → BM25 retrieval
    ├─ rules.py      deterministic checks (text + images) → findings with exact offsets
    ├─ visual.py     palette (median cut), CIE ΔE colour distance, WCAG contrast, logo aspect/colour/shape hash
@@ -101,7 +103,7 @@ FastAPI (server/main.py) ── SQLite (data/inkloom.db) + local file store (dat
 |------|----------|
 | Anthropic Claude API (`claude-opus-5-5`) **or** any OpenAI-compatible API: Google Gemini (`gemini-3.5-flash`, free tier), Groq, OpenRouter, Ollama | Grounded compliance review (text + images), guideline rewrite proposals |
 | FastAPI, Uvicorn | HTTP API and static hosting |
-| SQLite (stdlib) | Storage |
+| SQLite (stdlib) / PostgreSQL via psycopg 3 (Supabase) | Storage |
 | pypdf | PDF text extraction |
 | Pillow, NumPy | Palette extraction, colour science, logo comparison, demo image generation, and the feedback-learning model (logistic regression written from scratch in NumPy) |
 | Lucide icons (CDN), Inter font (Google Fonts) | UI |
@@ -125,7 +127,7 @@ No templates or boilerplate were used. Demo images and the brand-book PDF are ge
 - Sign-in is email + password with server-side sessions, but there is no self-service sign-up, password reset or SSO, and the one-click demo accounts must be turned off (`INKLOOM_DEMO_LOGIN=0`) for any real use. Production also needs per-tenant isolation. The failed-login lockout is per server instance (in memory).
 - The integrity hash lives in the same database. Production should anchor it externally (e.g. a signed log).
 - The Gemini path has been run live (free tier, `gemini-3.5-flash`); the Anthropic path has not been exercised with a live key in this build. Model names on free tiers change often, so override `INKLOOM_MODEL` if a provider rejects the default.
-- The feedback-learning model is small and only as good as the decisions it gets. Its demo metrics come mostly from **simulated** seed feedback, so they show the mechanism, not real-world accuracy. On Vercel the database lives in `/tmp`, so decisions (and the model) reset when the instance restarts.
+- The feedback-learning model is small and only as good as the decisions it gets. Its demo metrics come mostly from **simulated** seed feedback, so they show the mechanism, not real-world accuracy. Without `DATABASE_URL`, Vercel keeps the database in `/tmp`, so decisions (and the model) reset when an instance restarts; with Supabase they persist.
 
 ## Roadmap
 

@@ -17,6 +17,8 @@ os.environ.setdefault("INKLOOM_TEST_NO_AI", "1")
 if os.environ["INKLOOM_TEST_NO_AI"] == "1":
     os.environ["INKLOOM_DISABLE_AI"] = "1"
 
+os.environ["INKLOOM_DB"] = "sqlite"  # never touch a configured Postgres/Supabase
+
 from fastapi.testclient import TestClient  # noqa: E402
 
 from server.main import app  # noqa: E402
