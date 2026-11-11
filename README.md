@@ -91,7 +91,7 @@ FastAPI (server/main.py) ── SQLite (data/inkloom.db) + local file store (dat
 
 | What | Used for |
 |------|----------|
-| Anthropic Claude API (`claude-opus-5-5`) **or** any OpenAI-compatible API: Google Gemini (`gemini-2.5-flash`, free tier), Groq, OpenRouter, Ollama | Grounded compliance review (text + images), guideline rewrite proposals |
+| Anthropic Claude API (`claude-opus-5-5`) **or** any OpenAI-compatible API: Google Gemini (`gemini-3.5-flash`, free tier), Groq, OpenRouter, Ollama | Grounded compliance review (text + images), guideline rewrite proposals |
 | FastAPI, Uvicorn | HTTP API and static hosting |
 | SQLite (stdlib) | Storage |
 | pypdf | PDF text extraction |

@@ -8,6 +8,7 @@ confidence is reduced, so it can never masquerade as policy.
 import base64
 import io
 import json
+import time
 
 from PIL import Image
 
@@ -118,23 +119,34 @@ def _call_openai_compatible(system: str, content: list, schema: dict, max_tokens
                 parts.append({"type": "text", "text": "(image omitted: this model is configured without image input)"})
     sys_prompt = (system + "\n\nRespond with ONE JSON object only, no prose, matching this JSON Schema:\n"
                   + json.dumps(schema))
-    body = {"model": config.model(), "max_tokens": max_tokens, "temperature": 0.2,
-            "response_format": {"type": "json_object"},
-            "messages": [{"role": "system", "content": sys_prompt}, {"role": "user", "content": parts}]}
-    req = urllib.request.Request(config.base_url() + "/chat/completions", data=json.dumps(body).encode("utf-8"), method="POST",
-                                 headers={"Content-Type": "application/json", "Authorization": f"Bearer {config.api_key()}"})
-    try:
-        with urllib.request.urlopen(req, timeout=150) as r:
-            data = json.loads(r.read().decode("utf-8"))
-    except urllib.error.HTTPError as e:
-        detail = e.read().decode("utf-8", "replace")[:200]
-        if e.code in (401, 403):
-            raise AIUnavailable("API key rejected") from e
-        if e.code == 429:
-            raise AIUnavailable("Rate limited by the AI service (free-tier limit?)") from e
-        raise AIUnavailable(f"AI service error {e.code}: {detail}") from e
-    except (urllib.error.URLError, TimeoutError, OSError) as e:
-        raise AIUnavailable("Could not reach the AI service") from e
+    # Free tiers are often busy (503/429/timeouts): retry once, then try the fallback model.
+    models = [config.model()] + [m for m in [config.fallback_model()] if m and m != config.model()]
+    attempts = [(m, n) for m in models for n in range(2)]
+    data, last = None, None
+    for i, (model, _) in enumerate(attempts):
+        body = {"model": model, "max_tokens": max_tokens, "temperature": 0.2,
+                "response_format": {"type": "json_object"},
+                "messages": [{"role": "system", "content": sys_prompt}, {"role": "user", "content": parts}]}
+        req = urllib.request.Request(config.base_url() + "/chat/completions", data=json.dumps(body).encode("utf-8"), method="POST",
+                                     headers={"Content-Type": "application/json", "Authorization": f"Bearer {config.api_key()}"})
+        try:
+            with urllib.request.urlopen(req, timeout=90) as r:
+                data = json.loads(r.read().decode("utf-8"))
+            break
+        except urllib.error.HTTPError as e:
+            detail = e.read().decode("utf-8", "replace")[:200]
+            if e.code in (401, 403):
+                raise AIUnavailable("API key rejected") from e
+            if e.code not in (429, 500, 502, 503, 504):
+                raise AIUnavailable(f"AI service error {e.code}: {detail}") from e
+            last = AIUnavailable("Rate limited by the AI service (free-tier limit?)" if e.code == 429
+                                 else f"AI service busy ({e.code}); tried {', '.join(models)}")
+        except (urllib.error.URLError, TimeoutError, OSError):
+            last = AIUnavailable("Could not reach the AI service (timeout)")
+        if i < len(attempts) - 1:
+            time.sleep(1.5)
+    if data is None:
+        raise last or AIUnavailable("AI service unavailable")
     try:
         choice = data["choices"][0]
         text = choice["message"]["content"]
