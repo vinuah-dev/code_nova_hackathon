@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Inkloom AI — Brand Governance</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/app.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='9' fill='%234F46E5'/><path d='M10 22c4-1 8-5 10-12 1 4-1 9-4 12' stroke='white' stroke-width='2.5' fill='none' stroke-linecap='round'/></svg>">
+  <script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark"><i data-lucide="feather"></i></div>
+        <div><div class="brand-name">Inkloom AI</div><div class="brand-sub">Brand governance</div></div>
+      </div>
+      <nav class="nav" id="nav"></nav>
+      <div class="side-foot" id="side-foot"></div>
+    </aside>
+    <div class="main">
+      <header class="topbar">
+        <div class="crumbs" id="crumbs"></div>
+        <div class="spacer"></div>
+        <span id="ai-pill"></span>
+        <label class="role-switch" title="Switch user / role (demo)">
+          <div class="avatar" id="me-avatar">?</div>
+          <div class="who"><b id="me-name">…</b><span id="me-role"></span></div>
+          <i data-lucide="chevrons-up-down" class="sm"></i>
+          <select id="user-select" aria-label="Switch user"></select>
+        </label>
+      </header>
+      <main class="view" id="view"></main>
+    </div>
+  </div>
+  <div class="toasts" id="toasts"></div>
+  <script type="module" src="/js/app.js"></script>
+</body>
+</html>

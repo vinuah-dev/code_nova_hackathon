@@ -1,0 +1,5 @@
+data/
+scripts/
+.claude/
+.env
+__pycache__/

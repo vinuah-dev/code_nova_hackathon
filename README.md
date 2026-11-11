@@ -1,0 +1,118 @@
+# Inkloom AI — Intelligent Brand Governance
+
+> **AI recommends. Humans decide. Brand knowledge provides the evidence.**
+
+Inkloom checks marketing content **before it is published**. It compares the content against an organisation's approved brand knowledge (guidelines, verified facts, approved claims, terminology, palette and logos). It explains every issue with its source and suggests corrections. Content then goes through a role-based approval workflow, and the approved version is sealed with a SHA-256 hash.
+
+The demo organisation is **Voltaro Mobility**, a *fictional* Indian electric-scooter brand. All its people, figures and certificates are invented.
+
+---
+
+## Run it
+
+Requires Python 3.10+.
+
+```bash
+pip install -r requirements.txt
+python run.py
+```
+
+Open **http://127.0.0.1:8000**. On first start the database is created in `data/` and seeded with the demo organisation.
+
+**Enable Claude (optional):** copy `.env.example` to `.env`, set `ANTHROPIC_API_KEY`, then restart. Without a key the app runs in **Rule engine mode**: every deterministic check still runs, and the UI clearly labels the report as rule-engine only. This mode is also the automatic fallback if the AI service fails during a live demo.
+
+**Test the whole journey (no API key needed, uses a throwaway database):**
+
+```bash
+python scripts/smoke_test.py
+```
+
+It runs 34 checks covering upload → review → fixes → approval → integrity → gap intelligence → analytics.
+
+---
+
+## Demo script (≈ 6 minutes)
+
+Switch user from the top-right selector. Roles are enforced by the server.
+
+| # | As | Do |
+|---|----|----|
+| 1 | Anyone | **Dashboard**: compliance KPIs, most-violated guidelines, mistakes by channel |
+| 2 | Asha (Admin) | **Brand Brain → Documents** → upload `web/demo/Voltaro_Brand_Book_2026.pdf`. Then try **Test retrieval** with "diwali firecracker offer" |
+| 3 | Asha | **Approved facts** → *Add approved fact*; **Visual identity** shows the official logo and palette |
+| 4 | Rohan (Creator) | **Content Studio → New content → Load Diwali sample files** (an agency draft: caption, poster, and the logo file they used) |
+| 5–7 | Rohan | **Save & run brand review**. The report shows an unsupported claim ("fastest", "GUARANTEED"), a wrong range (150 vs 120 km), wrong product name, an expired offer, a stretched and recoloured logo, an off-brand red, low contrast, missing alt text and "click here". Each finding shows its **evidence** and source id |
+| 8–9 | Rohan | **Accept all text fixes** (or accept/reject one by one), toggle **Preview**, then **Apply** |
+| 10 | Rohan | The before/after pop-up shows the score moving (e.g. 9 → 32), dimension by dimension. **Brand DNA** compares the two versions |
+| — | Rohan | **Edit** → add alt text → re-run review → **Submit for approval** |
+| 11–12 | Meera (Manager) → Vikram (Approver) | Meera **Endorses**. Vikram **Approves**: open visual issues require a recorded **override reason** |
+| 13 | Asha | **Approval Center → Integrity Shield → Simulate tampering** (direct database edit) → alert with the word-level diff; the content drops back to re-review |
+| 14 | Asha | **Brand Intelligence**: "3 submissions used 'Glide-S1'…" → **Propose clearer guideline** → edit → **Approve**. Then try the **Brand DNA Simulator** |
+
+---
+
+## Architecture
+
+```
+Browser (vanilla JS SPA, no build step)
+   │  JSON over HTTP, X-User-Id header (demo identity; roles enforced server-side)
+FastAPI (server/main.py) ── SQLite (data/inkloom.db) + local file store (data/uploads)
+   ├─ rag.py        Brand Brain → chunks with stable ids → BM25 retrieval
+   ├─ rules.py      deterministic checks (text + images) → findings with exact offsets
+   ├─ visual.py     palette (median cut), CIE ΔE colour distance, WCAG contrast, logo aspect/colour/shape hash
+   ├─ ai.py         Claude review: retrieved sources in, JSON-schema findings out, citations validated
+   ├─ analysis.py   orchestrates rules + retrieval + AI, merges, scores, stores
+   ├─ scoring.py    transparent formula (below)
+   ├─ integrity.py  SHA-256 approval seal, verification, word-level diff
+   ├─ gaps.py       Guideline Gap Intelligence (repeated signatures across submissions)
+   └─ seed.py / demo_assets.py   fictional org + generated demo images/PDF
+```
+
+### Key technical decisions
+
+- **A hybrid engine, not "just ask the LLM".** Deterministic rules catch what must never be missed: wrong numbers, banned terms, palette, logo distortion, alt text. They are reproducible and point at exact characters. Claude adds what rules can't judge: tone drift, implied claims, visual misuse. If the AI is down, the product still works.
+- **Grounding you can verify.** Every Brand Brain item becomes a chunk with an id (`G-CLAIM-01`, `F-RANGE`, `DOC-1#3`…). The model gets only the top retrieved chunks and must cite ids. The server drops unknown ids. AI findings with no valid citation are labelled **Ungrounded** and get 40% less weight.
+- **BM25 instead of embeddings.** Brand knowledge is small and term-heavy (product names, numbers). Lexical retrieval is fast, needs no extra service, and its ranking can be shown to judges (**Brand Brain → Test retrieval**).
+- **Structured outputs.** Claude returns JSON constrained by a schema (`output_config.format`), so parsing can't break mid-demo. Requests use `claude-opus-5-5` by default, plus server-side refusal fallback. `stop_reason` and API errors are handled and fall back to the rule report.
+- **Fixes are span-exact and opt-in.** A fix applies only to the offsets the finding points at, only when a person accepted it, and only as a new version. The original is never overwritten.
+- **Scores are computed, not guessed:** `overall = 100 × e^(−Σ penalty/100)`, where penalty = severity weight (critical 35, high 20, medium 10, low 4) × confidence. Rejected (false-positive) findings don't count. Same input → same score.
+- **Integrity seal:** SHA-256 over canonical JSON of title + body + alt text + SHA-256 of every attached file, stored at approval. Edits inside the app and out-of-band database edits are both detected.
+
+### APIs, models, libraries
+
+| What | Used for |
+|------|----------|
+| Anthropic Claude API, model `claude-opus-5-5` (configurable via `INKLOOM_MODEL`) | Grounded compliance review (text + images), guideline rewrite proposals |
+| FastAPI, Uvicorn | HTTP API and static hosting |
+| SQLite (stdlib) | Storage |
+| pypdf | PDF text extraction |
+| Pillow, NumPy | Palette extraction, colour science, logo comparison, demo image generation |
+| Lucide icons (CDN), Inter font (Google Fonts) | UI |
+
+No templates or boilerplate were used. Demo images and the brand-book PDF are generated by `server/demo_assets.py`.
+
+---
+
+## Responsible design
+
+- **Disclosure:** with AI on, content text, images and the retrieved guideline excerpts are sent to Anthropic's API. The UI shows which engine produced every report and every finding.
+- **Confidential mode:** content marked confidential is never sent to an external service; only local rule checks run.
+- **Secrets:** the API key is read from `.env` on the server only and is never sent to the browser. `.env` is git-ignored.
+- **Human control:** AI never edits content. Approving with open critical or high findings needs a written override, which is stored in the approval record. Guideline changes proposed by the system need admin approval and are versioned.
+- **Explainability:** every finding shows its category, severity, confidence, engine, explanation, the approved source text, and (for images) the measured evidence (ΔE, aspect ratio, contrast ratio).
+
+## Known limitations
+
+- Image checks are heuristic. Palette contrast uses the two dominant colours, not OCR'd text. The logo check compares the logo file the creator declares; it does not locate the logo inside a poster (Claude's vision covers that when enabled).
+- Rule-based rewrites are simple substitutions; better rewrites come from Claude when enabled.
+- Demo identity uses a user switcher, not real authentication. Production needs SSO and per-tenant isolation.
+- The integrity hash lives in the same database. Production should anchor it externally (e.g. a signed log).
+- The Claude integration is implemented against the official SDK but **has not been exercised with a live API key in this build**. Run `INKLOOM_TEST_NO_AI=0 python scripts/smoke_test.py` with a key to verify it.
+
+## Roadmap
+
+CMS/Figma/Google Drive connectors · OCR for text inside images · multilingual checks (Hindi and other regional languages) · SSO and audit export · per-market rule sets · embeddings + BM25 hybrid retrieval as the Brand Brain grows · browser extension that checks drafts in place.
+
+## Disclosure (hackathon rule 7)
+
+This project was built with significant AI assistance (Claude Code). All dependencies are listed above and used under their licences.
