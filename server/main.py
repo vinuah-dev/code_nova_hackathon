@@ -14,7 +14,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
 
-from . import analysis, config, db, gaps, integrity, rag, scoring, visual
+from . import analysis, config, db, gaps, integrity, learning, rag, scoring, visual
 from .config import UPLOAD_DIR, WEB_DIR
 
 config.load_env()
@@ -53,6 +53,8 @@ def ensure_ready() -> None:
             if not db.one("SELECT id FROM users LIMIT 1"):
                 from . import seed
                 seed.seed()
+            if not db.one("SELECT id FROM ml_models LIMIT 1"):
+                learning.train()  # existing databases from before feedback learning
             _ready = True
 
 
@@ -427,6 +429,7 @@ def decide_finding(aid: int, data: dict = Body(...), x_user_id: str | None = Hea
         db.ex("INSERT INTO decisions(analysis_id, finding_id, decision, user_id, note, at) VALUES (?,?,?,?,?,?) "
               "ON CONFLICT(analysis_id, finding_id) DO UPDATE SET decision=excluded.decision, user_id=excluded.user_id, note=excluded.note, at=excluded.at",
               (aid, data["finding_id"], data["decision"], u["id"], data.get("note"), db.now()))
+    learning.train()  # every decision is a new training label (NumPy, a few milliseconds)
     a = db.one("SELECT content_id FROM analyses WHERE id=?", (aid,))
     return analysis.latest(a["content_id"])
 
@@ -679,6 +682,28 @@ def insight_decide(iid: int, data: dict = Body(...), x_user_id: str | None = Hea
     except ValueError as e:
         raise HTTPException(400, str(e))
     return {"ok": True}
+
+
+@app.get("/api/learning")
+def learning_summary():
+    return learning.summary()
+
+
+@app.post("/api/learning/train")
+def learning_train(x_user_id: str | None = Header(None)):
+    need(user(x_user_id), "brand")
+    learning.train()
+    return learning.summary()
+
+
+@app.post("/api/learning/mode")
+def learning_mode(data: dict = Body(...), x_user_id: str | None = Header(None)):
+    need(user(x_user_id), "brand")
+    try:
+        learning.set_mode(data.get("mode"))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return learning.summary()
 
 
 @app.get("/api/analytics")

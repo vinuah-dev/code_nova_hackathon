@@ -1,5 +1,5 @@
 """Runs a full review: rules + retrieval + (optionally) Claude, then scores."""
-from . import ai, config, db, rag, rules, scoring
+from . import ai, config, db, learning, rag, rules, scoring
 
 CATS = {"tone", "terminology", "claims", "facts", "visual", "accessibility"}
 SEVS = {"critical", "high", "medium", "low"}
@@ -85,6 +85,7 @@ def evaluate(body: str, alt_text: str, uploads: list[dict], allow_ai: bool = Tru
         except ai.AIUnavailable as e:
             err = str(e)
             note = f"AI review unavailable ({err}). Showing the rule-engine report; every finding below is still real."
+    learning.annotate(findings)  # recalibrates confidence only if the learned model passed its gate
     for f in findings:
         f["sources"] = [{"id": s, "title": lookup[s]["title"], "text": lookup[s]["text"], "type": lookup[s]["type"]}
                         for s in f.get("source_ids", []) if s in lookup]
@@ -120,6 +121,9 @@ def latest(content_id: int, version: int | None = None) -> dict | None:
     for f in a["findings"]:
         f["decision"] = dec.get(f["id"], {}).get("decision")
         f["decision_note"] = dec.get(f["id"], {}).get("note")
+    if any("learned" not in f for f in a["findings"]):
+        # Older reports: show the current model's opinion for reference, never re-score them.
+        learning.annotate([f for f in a["findings"] if "learned" not in f], apply=False)
     rejected = {fid for fid, d in dec.items() if d["decision"] == "rejected"}
     adj = scoring.score(a["findings"], ignore_ids=rejected)
     a["score_after_review"] = adj["overall"]

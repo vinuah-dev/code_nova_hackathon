@@ -86,6 +86,11 @@ CREATE TABLE IF NOT EXISTS gap_insights (
   description TEXT, count INTEGER, examples TEXT, suggestion TEXT, status TEXT DEFAULT 'open',
   decided_by TEXT, decided_at TEXT, created_at TEXT
 );
+CREATE TABLE IF NOT EXISTS ml_models (
+  id INTEGER PRIMARY KEY AUTOINCREMENT, trained_at TEXT, status TEXT, gate_passed INTEGER,
+  info TEXT, metrics TEXT, vocab TEXT, weights TEXT, reasons TEXT
+);
+CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value TEXT);
 """
 
 

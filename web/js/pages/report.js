@@ -186,6 +186,9 @@ function finding(f, ctx) {
     <div class="row wrap" style="gap:6px">${sevPill(f.severity)}<span class="pill">${icon(CAT_ICON[f.category] || "dot", "sm")} ${CAT[f.category] || f.category}</span>
       <span class="pill ${f.engine === "ai" ? "violet" : "indigo"}" title="${f.engine === "ai" ? "Found by the AI model, grounded in retrieved sources" : "Deterministic rule"}">${f.engine === "ai" ? "AI" : "Rule"}</span>
       ${f.engine === "ai" && !f.grounded ? `<span class="pill medium" title="The AI did not cite an approved source; treat as advisory">Ungrounded</span>` : ""}
+      ${f.learned ? `<span class="pill ${f.learned.applied ? "good" : ""} learned" title="${f.learned.applied
+        ? `Feedback-learning model (active): ${Math.round(f.learned.p * 100)}% likely a real issue, based on your team's past accept/reject decisions. Confidence recalibrated from ${Math.round((f.confidence_raw ?? f.confidence) * 100)}%.`
+        : `Feedback-learning model (shadow mode): ${Math.round(f.learned.p * 100)}% likely a real issue. Shown for reference only; it does not change the score yet.`}">${icon("graduation-cap", "sm")} ${Math.round(f.learned.p * 100)}%${f.learned.applied ? "" : " · shadow"}</span>` : ""}
       <span class="conf right" title="Confidence">${Math.round((f.confidence || 0) * 100)}%<span class="bar-track"><span class="bar-fill" style="display:block;width:${(f.confidence || 0) * 100}%"></span></span></span>
     </div>
     <div class="ttl" style="margin-top:8px">${esc(f.title)}</div>

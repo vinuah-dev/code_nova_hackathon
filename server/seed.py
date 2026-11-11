@@ -4,9 +4,10 @@ All organisations, people, figures and certificates below are invented for the d
 Seeded submissions are analysed by the real rule engine at setup time (no AI call),
 so their findings and scores are genuine outputs of the product, not hard-coded.
 """
+import hashlib
 import shutil
 
-from . import analysis, db, demo_assets, integrity
+from . import analysis, db, demo_assets, integrity, learning
 from .config import UPLOAD_DIR, WEB_DIR
 
 USERS = [
@@ -115,6 +116,73 @@ SUBMISSIONS = [
 ]
 
 
+# Older, already-published posts (Aug–Sep 2026) with SEEDED reviewer feedback, so the feedback-learning
+# model has something to learn from in the demo. Findings come from the real rule engine; only the
+# accept/reject decisions are simulated, using the per-rule policy below, and every one of them is
+# stored with the note "Seeded demo feedback" so the UI can show seeded vs real decisions separately.
+HISTORY = [
+    ("Weekend ride diaries", "Instagram", "u-creator",
+     "Sunday mornings feel different on a Voltaro Glide S1! Quiet streets, cool air and zero noise. #weekendride #voltaro"),
+    ("Charging explained", "Blog", "u-creator",
+     "Charging your Glide-S1 at home is simple because the onboard charger works with a standard 15 A socket and the app tells you exactly how long is left so you can plan your day without worrying about range at all. Charges 0–80% in 60 minutes with the Voltaro Fast Charger."),
+    ("Festive greetings", "Facebook", "u-agency",
+     "Happy Navratri from all of us at Voltaro! Ride bright, ride safe! Zero emissions, all the celebration."),
+    ("City commute tips", "LinkedIn", "u-creator",
+     "Commuting in Bengaluru traffic is easier on a scooter that is light, quick to park and silent, and our riders tell us that the Voltaro Glide S1 has cut their daily travel time while also cutting fuel costs to nearly nothing every single month."),
+    ("Range myth buster", "Instagram", "u-agency",
+     "Range anxiety? Not with the GlideS1. Ride 110 km on a single charge. The best way to beat traffic! #rangeanxiety"),
+    ("Service centre launch", "Twitter", "u-creator",
+     "Our new Pune service centre is open! Book a slot online, and click here for directions."),
+    ("Rider story: Ananya", "Blog", "u-agency",
+     "Ananya rides 40 km every day across Hyderabad and says the Voltaro Glide S1 is the most comfortable scooter she has owned, with a seat that stays comfortable through long rides and a ride quality that handles potholes without fuss."),
+    ("Battery care 101", "Newsletter", "u-creator",
+     "Keep your battery between 20% and 80% for daily rides. The battery warranty covers 5 years. Zero maintenance worries!"),
+    ("Monsoon offer recap", "Email", "u-agency",
+     "Thank you for an amazing monsoon season! Hurry, our crazy deal on accessories is back for one week only!"),
+    ("Top speed reel", "Instagram", "u-creator",
+     "85 km/h top speed, zero compromise on control. Meet the fastest way across town! #voltaroglide"),
+    ("Dealer onboarding note", "Internal", "u-creator",
+     "Please brief every new dealer on the Voltaro Glide S1 fact sheet before launch day so that every number they quote to customers about range, charging and warranty matches what the certificate says and nothing older is repeated."),
+    ("Accessory launch", "Facebook", "u-agency",
+     "New helmets and rain covers for your Voltaro S1 are here! Cheap, cheerful and built for Indian roads."),
+    ("Green commute week", "LinkedIn", "u-creator",
+     "This Green Commute Week, Voltaro riders across 40 cities saved fuel and time. Zero tailpipe emissions, every single ride."),
+    ("Test ride invite", "Email", "u-agency",
+     "Your test ride is confirmed! Bring a valid licence and arrive ten minutes early. #testride"),
+]
+# Simulated reviewer behaviour: how often the team rejected each rule family as a false positive.
+SEED_REJECT_RATE = {"a11y:long-sentence": 0.85, "a11y:hashtag-case": 0.7, "tone:exclamation": 0.65, "claim": 0.55}
+
+
+def _seed_feedback() -> None:
+    for i, (title, channel, owner, body) in enumerate(HISTORY):
+        ts = f"2026-{8 + i // 8:02d}-{(i * 4) % 27 + 1:02d}T10:30:00Z"
+        cid = db.ex("INSERT INTO content(title, channel, status, owner_id, confidential, current_version, is_demo, created_at, updated_at)"
+                    " VALUES (?,?,?,?,0,1,1,?,?)", (title, channel, "approved", owner, ts, ts))
+        db.ex("INSERT INTO versions(content_id, number, body, alt_text, attachments, created_by, created_at, note) VALUES (?,?,?,?,?,?,?,?)",
+              (cid, 1, body, "", "[]", owner, ts, "Seeded demo content (published archive)"))
+        res = analysis.evaluate(body, "", [], allow_ai=False)
+        aid = db.ex("INSERT INTO analyses(content_id, version_number, mode, engine_note, score, dimensions, findings, retrieved, ai_error, created_at)"
+                    " VALUES (?,?,?,?,?,?,?,?,?,?)",
+                    (cid, 1, "rules", "Seeded demo data, analysed by the rule engine during setup.", res["score"], db.j(res["dimensions"]),
+                     db.j(res["findings"]), db.j(res["retrieved"]), None, ts))
+        for f in res["findings"]:
+            fam = learning.family(f)
+            rate = SEED_REJECT_RATE.get(fam, SEED_REJECT_RATE.get(fam.split(":")[0], 0.08))
+            u = int(hashlib.sha256(f"{title}|{f['id']}".encode()).hexdigest()[:8], 16) / 0xFFFFFFFF
+            db.ex("INSERT INTO decisions(analysis_id, finding_id, decision, user_id, note, at) VALUES (?,?,?,?,?,?)",
+                  (aid, f["id"], "rejected" if u < rate else "accepted", owner, learning.SEED_NOTE, ts))
+        c = db.one("SELECT * FROM content WHERE id=?", (cid,))
+        v = db.one("SELECT * FROM versions WHERE content_id=? AND number=1", (cid,))
+        h = integrity.version_hash(c, v)
+        db.ex("UPDATE content SET approved_version=1, approved_hash=? WHERE id=?", (h, cid))
+        snap = db.j({"title": title, "body": body, "alt_text": "", "version": 1, "hash": h, "score": res["score"], "note": "Seeded approval"})
+        for action, frm, to, actor, note in (("created", None, "draft", owner, "Seeded demo content (published archive)"),
+                                             ("approved", "pending_approval", "approved", "u-approver", snap)):
+            db.ex("INSERT INTO events(content_id, user_id, action, from_status, to_status, note, at) VALUES (?,?,?,?,?,?,?)",
+                  (cid, actor, action, frm, to, note, ts))
+
+
 def _add_asset(src, name, kind="logo"):
     dest = UPLOAD_DIR / f"brand_{src.name}"
     shutil.copy(src, dest)
@@ -182,3 +250,5 @@ def seed() -> None:
             db.ex("INSERT INTO comments(content_id, user_id, body, at) VALUES (?,?,?,?)",
                   (cid, "u-manager" if final == "needs_revision" else "u-approver", comment, ts))
         db.ex("UPDATE content SET status=? WHERE id=?", (final, cid))
+    _seed_feedback()
+    learning.train()

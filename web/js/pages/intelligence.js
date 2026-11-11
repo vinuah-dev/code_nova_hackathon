@@ -6,12 +6,13 @@ const SAMPLE_B = "The Glide-S1 offers 150 km of range — the best in India!! Ch
 
 export async function render(view, ctx) {
   const qs = new URLSearchParams(location.hash.split("?")[1] || "");
-  const insights = await api("/api/insights");
+  const [insights, learn] = await Promise.all([api("/api/insights"), api("/api/learning")]);
   const admin = ctx.status.permissions.brand.includes(ctx.me.role);
   const open = insights.filter((i) => i.status === "open");
   view.innerHTML = `
     <div class="page-head"><div><h1>Brand Intelligence</h1><div class="sub">Learn from repeated mistakes, and see how an edit changes brand identity before it ships.</div></div></div>
-    <div class="grid" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:start">
+    ${learningCard(learn, admin)}
+    <div class="grid" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:start;margin-top:18px">
       <div class="stack">
         <div class="card"><div class="card-h"><h2>${icon("lightbulb", "sm")} Guideline Gap Intelligence</h2><span class="pill indigo right">${open.length} open</span></div>
           <div class="card-b"><p class="ink2" style="margin-top:0">When the same mistake appears in 3 or more different submissions, the guideline is probably unclear, not just the writer. Inkloom proposes a clearer rule; an admin must approve it before it becomes official.</p>
@@ -41,6 +42,15 @@ export async function render(view, ctx) {
     if (r) { $("#dna").innerHTML = result(r, `Version ${qs.get("a")}`, `Version ${qs.get("b")}`); $("#dna").scrollIntoView({ behavior: "smooth" }); }
   }
   view.onclick = async (e) => {
+    const lm = e.target.closest("[data-lmode],[data-retrain]");
+    if (lm) {
+      lm.disabled = true;
+      const r = lm.dataset.retrain != null
+        ? await guard(() => api("/api/learning/train", { method: "POST" }), "Model retrained and re-evaluated")
+        : await guard(() => api("/api/learning/mode", { method: "POST", body: { mode: lm.dataset.lmode } }), "Learning mode updated");
+      if (r) render(view, ctx); else lm.disabled = false;
+      return;
+    }
     const t = e.target.closest("[data-propose],[data-approve],[data-dismiss]");
     if (!t) return;
     if (t.dataset.propose) { if (await guard(() => api(`/api/insights/${t.dataset.propose}/propose`, { method: "POST" }), "Proposal ready for review")) render(view, ctx); return; }
@@ -85,4 +95,57 @@ function result(r, la, lb) {
     </div>
     <div class="hr"></div><div class="section-lbl">Text changes</div><div class="doc" style="font-size:14px">${diffHtml(r.diff)}</div>
   </div></div>`;
+}
+
+function learningCard(L, admin) {
+  const m = L.model, th = L.thresholds;
+  const st = !m || !m.weights ? "collecting" : m.status;
+  const pill = { active: `<span class="pill good">${icon("zap", "sm")} Active · recalibrating scores</span>`,
+    shadow: `<span class="pill medium">${icon("eye", "sm")} Shadow mode · scores unchanged</span>`,
+    collecting: `<span class="pill">${icon("hourglass", "sm")} Collecting feedback</span>` }[st];
+  const info = m?.info || { n: 0, real: 0, seeded: 0, positives: 0, negatives: 0, groups: 0 };
+  const met = m?.metrics;
+  const pct = (v) => v == null ? "–" : `${Math.round(v * 100)}%`;
+  const row = (label, a, b, better) => `<tr><td>${label}</td><td><b>${a}</b></td><td>${b}</td><td>${better ? `<span class="pill good">better</span>` : `<span class="pill">not better</span>`}</td></tr>`;
+  const progress = Math.min(100, (info.n / th.min_samples) * 100);
+  const maxW = Math.max(...(L.signals || []).map((s) => Math.abs(s.weight)), 0.01);
+  return `<div class="card"><div class="card-h wrap"><h2>${icon("graduation-cap", "sm")} Feedback Learning model</h2>${pill}
+      ${admin ? `<div class="right row" style="gap:6px"><button class="btn sm ghost" data-retrain>${icon("refresh-cw", "sm")} Retrain</button>
+        ${m?.mode === "shadow" ? `<button class="btn sm" data-lmode="auto">Allow auto-activation</button>` : `<button class="btn sm" data-lmode="shadow">Pin to shadow</button>`}</div>` : ""}</div>
+    <div class="card-b">
+      <p class="ink2" style="margin-top:0">Inkloom trains its own small model (logistic regression in NumPy) on your team's accept/reject decisions to predict which findings are real issues and which are false positives.
+        ${st === "active" ? "It passed its quality gate, so it now <b>recalibrates the confidence</b> of new findings. Gemini and the rule engine still produce every finding; nothing is hidden."
+        : "Until it clearly beats the engine's own confidence in cross-validation, it runs in <b>shadow mode</b>: Gemini + rules decide the score, and the model's prediction is only shown next to each finding."}</p>
+      <div class="grid g6 g4" style="gap:12px;margin:14px 0">
+        <div class="kpi"><div class="lbl">Training decisions</div><div class="val">${info.n}</div><div class="small muted">${info.real} real · ${info.seeded} seeded demo</div></div>
+        <div class="kpi"><div class="lbl">Accepted / rejected</div><div class="val">${info.positives}/${info.negatives}</div><div class="small muted">across ${info.groups} submissions</div></div>
+        <div class="kpi"><div class="lbl">CV accuracy</div><div class="val">${met ? Math.round(met.model.accuracy * 100) + "%" : "–"}</div><div class="small muted">baseline ${met ? pct(met.baseline.accuracy) : "–"}</div></div>
+        <div class="kpi"><div class="lbl">Brier improvement</div><div class="val">${met ? Math.round(met.brier_gain * 100) + "%" : "–"}</div><div class="small muted">needs ≥ ${Math.round(th.min_gain * 100)}%</div></div>
+      </div>
+      <div class="compare" style="align-items:start">
+        <div>
+          <div class="section-lbl">Quality gate</div>
+          <div class="small ink2" style="margin-bottom:6px">${info.n} / ${th.min_samples} decisions</div>
+          <div class="bar-track" style="margin-bottom:10px"><div class="bar-fill" style="width:${progress}%;background:${progress >= 100 ? "var(--good)" : "var(--primary)"}"></div></div>
+          ${m?.reasons?.length ? `<ul class="small ink2" style="margin:0;padding-left:18px">${m.reasons.map((r) => `<li>${esc(r)}</li>`).join("")}</ul>`
+            : m ? `<div class="small" style="color:var(--good)">${icon("check-circle-2", "sm")} All checks passed${m.mode === "shadow" ? ", but an admin pinned it to shadow mode." : "."}</div>` : ""}
+          ${met ? `<table class="t keep" style="margin-top:12px"><thead><tr><th>Out-of-fold (${met.folds}-fold, grouped)</th><th>Model</th><th>Baseline</th><th></th></tr></thead><tbody>
+            ${row("Brier score (lower is better)", met.model.brier.toFixed(3), met.baseline.brier.toFixed(3), met.model.brier < met.baseline.brier)}
+            ${row("Log loss (lower is better)", met.model.log_loss.toFixed(3), met.baseline.log_loss.toFixed(3), met.model.log_loss < met.baseline.log_loss)}
+            ${row("Accuracy", pct(met.model.accuracy), pct(met.baseline.accuracy), met.model.accuracy > met.baseline.accuracy)}
+            ${row("AUC", met.model.auc?.toFixed(3) ?? "–", met.baseline.auc?.toFixed(3) ?? "–", (met.model.auc ?? 0) > (met.baseline.auc ?? 0))}</tbody></table>
+            <div class="small muted" style="margin-top:6px">Baseline = the engine's own confidence used as the probability. Folds are split by submission, so the model is never tested on content it trained on.</div>` : ""}
+        </div>
+        <div>
+          <div class="section-lbl">What it has learned</div>
+          ${L.signals?.length ? `<div class="bars">${L.signals.map((s) => `<div class="bar-row" title="Weight ${s.weight}">
+            <div class="name">${esc(s.label)}</div>
+            <div class="bar-track"><div class="bar-fill" style="width:${(Math.abs(s.weight) / maxW) * 100}%;background:${s.weight > 0 ? "var(--good)" : "var(--critical)"}"></div></div>
+            <div class="v small" style="white-space:nowrap;min-width:64px">${s.weight > 0 ? "real issue" : "false alarm"}</div></div>`).join("")}</div>
+            <div class="small muted" style="margin-top:6px">Green pushes towards "real issue", red towards "false positive".</div>`
+            : `<div class="empty small">Accept or reject findings in any report to start training.</div>`}
+        </div>
+      </div>
+      ${info.seeded ? `<div class="banner info" style="margin-top:14px">${icon("info", "sm")}<div>${info.seeded} of the training decisions are <b>seeded demo feedback</b> on the fictional Voltaro archive (simulated reviewers who often reject "long sentence", "hashtag" and "exclamation" findings). Every accept/reject you make in a report is added, and the model retrains instantly.</div></div>` : ""}
+    </div></div>`;
 }
