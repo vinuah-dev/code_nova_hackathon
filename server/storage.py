@@ -4,6 +4,7 @@ Files are written to the local upload folder as before and, when a Postgres data
 also stored in the `blobs` table. `local(path)` returns a readable local path, restoring the file
 from the database first if this instance has never seen it (another Vercel instance uploaded it).
 """
+import re
 from pathlib import Path
 
 from . import db
@@ -11,7 +12,8 @@ from .config import UPLOAD_DIR
 
 
 def _key(path) -> str:
-    return Path(path).name
+    # Split on both separators: rows written on Windows (D:\...\x.png) must resolve on Linux too.
+    return re.split(r"[\\/]", str(path))[-1]
 
 
 def save(path, raw: bytes, mime: str | None = None) -> None:
