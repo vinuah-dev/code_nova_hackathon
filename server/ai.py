@@ -81,6 +81,73 @@ def _image_block(path: str) -> dict:
 
 
 def _call(system: str, content: list, schema: dict, max_tokens: int = 16000) -> dict:
+    if not config.ai_configured():
+        raise AIUnavailable("No AI provider configured")
+    if config.provider() != "anthropic":
+        return _call_openai_compatible(system, content, schema, max_tokens)
+    return _call_anthropic(system, content, schema, max_tokens)
+
+
+def _extract_json(text: str) -> dict:
+    t = (text or "").strip()
+    if t.startswith("```"):
+        t = t.split("\n", 1)[1] if "\n" in t else t
+        t = t.rsplit("```", 1)[0]
+    start, end = t.find("{"), t.rfind("}")
+    if start < 0 or end < start:
+        raise AIUnavailable("AI returned no JSON")
+    try:
+        return json.loads(t[start:end + 1])
+    except ValueError as e:
+        raise AIUnavailable("AI returned invalid JSON") from e
+
+
+def _call_openai_compatible(system: str, content: list, schema: dict, max_tokens: int) -> dict:
+    """Gemini / Groq / OpenRouter / Ollama via the OpenAI-compatible /chat/completions API (stdlib only)."""
+    import urllib.error
+    import urllib.request
+    parts = []
+    for blk in content:
+        if blk["type"] == "text":
+            parts.append({"type": "text", "text": blk["text"]})
+        elif blk["type"] == "image":
+            if config.send_images():
+                src = blk["source"]
+                parts.append({"type": "image_url", "image_url": {"url": f"data:{src['media_type']};base64,{src['data']}"}})
+            else:
+                parts.append({"type": "text", "text": "(image omitted: this model is configured without image input)"})
+    sys_prompt = (system + "\n\nRespond with ONE JSON object only, no prose, matching this JSON Schema:\n"
+                  + json.dumps(schema))
+    body = {"model": config.model(), "max_tokens": max_tokens, "temperature": 0.2,
+            "response_format": {"type": "json_object"},
+            "messages": [{"role": "system", "content": sys_prompt}, {"role": "user", "content": parts}]}
+    req = urllib.request.Request(config.base_url() + "/chat/completions", data=json.dumps(body).encode("utf-8"), method="POST",
+                                 headers={"Content-Type": "application/json", "Authorization": f"Bearer {config.api_key()}"})
+    try:
+        with urllib.request.urlopen(req, timeout=150) as r:
+            data = json.loads(r.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        detail = e.read().decode("utf-8", "replace")[:200]
+        if e.code in (401, 403):
+            raise AIUnavailable("API key rejected") from e
+        if e.code == 429:
+            raise AIUnavailable("Rate limited by the AI service (free-tier limit?)") from e
+        raise AIUnavailable(f"AI service error {e.code}: {detail}") from e
+    except (urllib.error.URLError, TimeoutError, OSError) as e:
+        raise AIUnavailable("Could not reach the AI service") from e
+    try:
+        choice = data["choices"][0]
+        text = choice["message"]["content"]
+    except (KeyError, IndexError, TypeError) as e:
+        raise AIUnavailable("Unexpected AI response format") from e
+    if isinstance(text, list):  # some servers return content parts
+        text = "".join(p.get("text", "") for p in text if isinstance(p, dict))
+    if choice.get("finish_reason") == "length":
+        raise AIUnavailable("AI response was cut off")
+    return _extract_json(text)
+
+
+def _call_anthropic(system: str, content: list, schema: dict, max_tokens: int) -> dict:
     import anthropic
     client = _client()
     try:

@@ -35,10 +35,10 @@ async function loadShell() {
   paintMe();
   const ai = ctx.status.ai_configured;
   $("#ai-pill").innerHTML = ai
-    ? `<span class="pill violet" title="Model: ${esc(ctx.status.model)}">${icon("sparkles", "sm")} Claude + Rules</span>`
+    ? `<span class="pill violet" title="Model: ${esc(ctx.status.model)}">${icon("sparkles", "sm")} ${esc(ctx.status.provider_label)} + Rules</span>`
     : `<span class="pill medium" title="Set ANTHROPIC_API_KEY to enable AI review">${icon("cpu", "sm")} Rule engine mode</span>`;
   $("#side-foot").innerHTML = `<div class="row"><span class="dot ${ai ? "on" : "off"}"></span><b>${ai ? "AI review on" : "AI review off"}</b></div>
-    <div style="margin-top:4px">${ai ? `Model <code>${esc(ctx.status.model)}</code>. Content marked confidential is never sent.` : "Deterministic checks only. Add an API key in <code>.env</code> to enable Claude."}</div>`;
+    <div style="margin-top:4px">${ai ? `Model <code>${esc(ctx.status.model)}</code>. Content marked confidential is never sent.` : "Deterministic checks only. Add an AI key in <code>.env</code> (free Gemini key works) to enable AI review."}</div>`;
 }
 
 function paintMe() {

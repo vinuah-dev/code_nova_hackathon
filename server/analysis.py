@@ -1,6 +1,9 @@
 """Runs a full review: rules + retrieval + (optionally) Claude, then scores."""
 from . import ai, config, db, rag, rules, scoring
 
+CATS = {"tone", "terminology", "claims", "facts", "visual", "accessibility"}
+SEVS = {"critical", "high", "medium", "low"}
+
 
 def _uploads(ids: list[int]) -> list[dict]:
     if not ids:
@@ -20,7 +23,20 @@ def _locate(text: str, quote: str) -> tuple[int | None, int | None]:
 
 def _merge_ai(result: dict, texts: dict, rule_findings: list[dict], lookup: dict, images: list[dict]) -> list[dict]:
     out = []
-    for n, f in enumerate(result.get("findings", []), 1):
+    raw = result.get("findings") if isinstance(result, dict) else None
+    for n, f in enumerate(raw if isinstance(raw, list) else [], 1):
+        # Providers without strict schemas can return loose JSON: normalise or skip.
+        if not isinstance(f, dict) or f.get("category") not in CATS or f.get("severity") not in SEVS:
+            continue
+        f.setdefault("title", "Brand issue")
+        f.setdefault("explanation", "")
+        f["source_ids"] = [s for s in f.get("source_ids") or [] if isinstance(s, str)]
+        try:
+            f["confidence"] = float(f.get("confidence") or 0.6)
+        except (TypeError, ValueError):
+            f["confidence"] = 0.6
+        if f.get("target") not in ("body", "alt_text", "pdf", "image"):
+            f["target"] = "body"
         target = f.get("target", "body")
         if target == "image":
             target = f"image:{images[0]['id']}" if images else "body"
@@ -65,7 +81,7 @@ def evaluate(body: str, alt_text: str, uploads: list[dict], allow_ai: bool = Tru
             res = ai.review(body, alt_text, pdf_text, images, logos, sources, rule_findings)
             texts = {"body": body or "", "alt_text": alt_text or "", "pdf": pdf_text}
             findings += _merge_ai(res, texts, rule_findings, lookup, images)
-            mode, note = "ai+rules", res.get("summary", "")
+            mode, note = "ai+rules", f"{config.provider_label()} · {config.model()}: " + str(res.get("summary", ""))
         except ai.AIUnavailable as e:
             err = str(e)
             note = f"AI review unavailable ({err}). Showing the rule-engine report; every finding below is still real."

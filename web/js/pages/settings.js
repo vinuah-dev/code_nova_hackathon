@@ -14,15 +14,15 @@ export async function render(view, ctx) {
         <div class="card"><div class="card-h"><h2>${icon("sparkles", "sm")} AI review</h2></div><div class="card-b">
           <div class="row"><span class="dot ${s.ai_configured ? "on" : "off"}"></span><b>${s.ai_configured ? "Connected" : "Not configured: rule engine mode"}</b></div>
           <table class="t" style="margin-top:10px"><tbody>
-            <tr><td class="muted">Provider</td><td>Anthropic Claude API (server-side only)</td></tr>
+            <tr><td class="muted">Provider</td><td>${esc(s.provider_label)} <span class="muted">(${esc(s.provider)}, called from the server only)</span></td></tr>
             <tr><td class="muted">Model</td><td><code>${esc(s.model)}</code></td></tr><tr><td class="muted">Effort</td><td><code>${esc(s.effort)}</code></td></tr>
             <tr><td class="muted">Grounding</td><td>BM25 retrieval over the Brand Brain; cited ids are validated server-side</td></tr>
             <tr><td class="muted">Fallback</td><td>If the AI is unavailable, the deterministic rule-engine report is shown and labelled</td></tr></tbody></table>
-          ${s.ai_configured ? "" : `<div class="banner info" style="margin-top:12px">${icon("key-round", "sm")}<div>To enable Claude: copy <code>.env.example</code> to <code>.env</code>, set <code>ANTHROPIC_API_KEY</code>, restart <code>python run.py</code>. The key stays on the server and is never sent to the browser.</div></div>`}
+          ${s.ai_configured ? "" : `<div class="banner info" style="margin-top:12px">${icon("key-round", "sm")}<div>To enable AI review for free: get a key at <b>aistudio.google.com</b> (Google AI Studio), put <code>INKLOOM_AI_PROVIDER=gemini</code> and <code>GEMINI_API_KEY=...</code> in <code>.env</code> (or Vercel → Environment Variables) and restart. Claude works too with <code>ANTHROPIC_API_KEY</code>. Keys stay on the server and never reach the browser.</div></div>`}
         </div></div>
         <div class="card"><div class="card-h"><h2>${icon("lock", "sm")} Privacy & responsible AI</h2></div><div class="card-b ink2">
           <ul style="margin:0;padding-left:18px" class="kbd-list">
-            <li><b>Disclosure:</b> with AI on, content text, images and retrieved guideline excerpts are sent to Anthropic's API for review. Nothing is sent in rule-engine mode.</li>
+            <li><b>Disclosure:</b> with AI on, content text, images and retrieved guideline excerpts are sent to the configured AI provider (${esc(s.provider_label)}) for review. Free tiers (e.g. Gemini free) may let the provider use submitted data to improve its products, so use Confidential mode for sensitive material. Nothing is sent in rule-engine mode.</li>
             <li><b>Confidential content</b> (toggle in Content Studio) is never sent to any external service; only local rule checks run.</li>
             <li>Brand assets, uploads and the database are stored locally in <code>data/</code>.</li>
             <li><b>Human control:</b> AI never edits content. Fixes apply only when a person accepts them, as a new version; the original is kept.</li>

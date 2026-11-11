@@ -138,7 +138,7 @@ def public_upload(u: dict) -> dict:
 # ---------------------------------------------------------------- status & users
 @app.get("/api/status")
 def status():
-    return {"ai_configured": config.ai_configured(), "model": config.model(), "effort": config.effort(),
+    return {"ai_configured": config.ai_configured(), "provider": config.provider(), "provider_label": config.provider_label(), "model": config.model(), "effort": config.effort(),
             "scoring": scoring.explain(), "status_labels": STATUS_LABEL, "permissions": {k: sorted(v) for k, v in PERMS.items()}}
 
 

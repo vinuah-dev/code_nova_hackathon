@@ -25,8 +25,51 @@ def load_env() -> None:
             os.environ[k] = v
 
 
+# Providers. "anthropic" uses the official SDK; the others speak the OpenAI-compatible
+# /chat/completions protocol, which Gemini, Groq, OpenRouter and Ollama all expose.
+PRESETS = {
+    "anthropic": {"label": "Claude", "model": "claude-opus-5-5", "base_url": None},
+    "gemini": {"label": "Gemini", "model": "gemini-2.5-flash", "base_url": "https://generativelanguage.googleapis.com/v1beta/openai"},
+    "groq": {"label": "Groq", "model": "meta-llama/llama-4-scout-17b-16e-instruct", "base_url": "https://api.groq.com/openai/v1"},
+    "openrouter": {"label": "OpenRouter", "model": "google/gemini-2.5-flash", "base_url": "https://openrouter.ai/api/v1"},
+    "ollama": {"label": "Ollama (local)", "model": "llama3.2-vision", "base_url": "http://localhost:11434/v1"},
+    "openai-compatible": {"label": "AI", "model": "", "base_url": None},
+}
+
+
+def provider() -> str:
+    p = (os.environ.get("INKLOOM_AI_PROVIDER") or "").strip().lower()
+    if p in PRESETS:
+        return p
+    if os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN"):
+        return "anthropic"
+    if os.environ.get("GEMINI_API_KEY"):
+        return "gemini"
+    return "anthropic"
+
+
+def provider_label() -> str:
+    return PRESETS[provider()]["label"]
+
+
 def model() -> str:
-    return os.environ.get("INKLOOM_MODEL", "claude-opus-5-5")
+    return os.environ.get("INKLOOM_MODEL") or PRESETS[provider()]["model"]
+
+
+def base_url() -> str | None:
+    return (os.environ.get("INKLOOM_AI_BASE_URL") or PRESETS[provider()]["base_url"] or "").rstrip("/") or None
+
+
+def api_key() -> str | None:
+    p = provider()
+    if p == "anthropic":
+        return os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN")
+    return (os.environ.get("INKLOOM_AI_API_KEY") or (os.environ.get("GEMINI_API_KEY") if p == "gemini" else None)
+            or ("ollama" if p == "ollama" else None))
+
+
+def send_images() -> bool:
+    return os.environ.get("INKLOOM_AI_IMAGES", "1") != "0"
 
 
 def effort() -> str:
@@ -36,4 +79,6 @@ def effort() -> str:
 def ai_configured() -> bool:
     if os.environ.get("INKLOOM_DISABLE_AI") == "1":
         return False
-    return bool(os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN"))
+    if provider() != "anthropic" and not base_url():
+        return False
+    return bool(api_key())

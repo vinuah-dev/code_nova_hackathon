@@ -19,7 +19,16 @@ python run.py
 
 Open **http://127.0.0.1:8000**. On first start the database is created in `data/` and seeded with the demo organisation.
 
-**Enable Claude (optional):** copy `.env.example` to `.env`, set `ANTHROPIC_API_KEY`, then restart. Without a key the app runs in **Rule engine mode**: every deterministic check still runs, and the UI clearly labels the report as rule-engine only. This mode is also the automatic fallback if the AI service fails during a live demo.
+**Enable AI review (optional, free option available):** copy `.env.example` to `.env` and pick a provider:
+
+| Provider | Cost | Set in `.env` |
+|---|---|---|
+| **Google Gemini** (recommended free option) | Free tier key from [Google AI Studio](https://aistudio.google.com) | `INKLOOM_AI_PROVIDER=gemini`, `GEMINI_API_KEY=…` |
+| Anthropic Claude | Paid API credits | `ANTHROPIC_API_KEY=…` |
+| Groq / OpenRouter | Free keys with rate limits | `INKLOOM_AI_PROVIDER=groq`, `INKLOOM_AI_API_KEY=…` |
+| Ollama (local) | Free, offline, private | `INKLOOM_AI_PROVIDER=ollama` |
+
+On Vercel, add the same variables under Project → Settings → Environment Variables and redeploy. Without any key the app runs in **Rule engine mode**: every deterministic check still runs and the UI labels the report as rule-engine only. This is also the automatic fallback if the AI service fails or hits a free-tier rate limit.
 
 **Test the whole journey (no API key needed, uses a throwaway database):**
 
@@ -27,7 +36,7 @@ Open **http://127.0.0.1:8000**. On first start the database is created in `data/
 python scripts/smoke_test.py
 ```
 
-It runs 34 checks covering upload → review → fixes → approval → integrity → gap intelligence → analytics.
+It runs 34 checks covering upload → review → fixes → approval → integrity → gap intelligence → analytics. `python scripts/mock_ai_test.py` runs 11 more against a local mock of an OpenAI-compatible AI server (request format, image input, grounding validation, fallback on 429).
 
 ---
 
@@ -82,7 +91,7 @@ FastAPI (server/main.py) ── SQLite (data/inkloom.db) + local file store (dat
 
 | What | Used for |
 |------|----------|
-| Anthropic Claude API, model `claude-opus-5-5` (configurable via `INKLOOM_MODEL`) | Grounded compliance review (text + images), guideline rewrite proposals |
+| Anthropic Claude API (`claude-opus-5-5`) **or** any OpenAI-compatible API: Google Gemini (`gemini-2.5-flash`, free tier), Groq, OpenRouter, Ollama | Grounded compliance review (text + images), guideline rewrite proposals |
 | FastAPI, Uvicorn | HTTP API and static hosting |
 | SQLite (stdlib) | Storage |
 | pypdf | PDF text extraction |
@@ -95,7 +104,7 @@ No templates or boilerplate were used. Demo images and the brand-book PDF are ge
 
 ## Responsible design
 
-- **Disclosure:** with AI on, content text, images and the retrieved guideline excerpts are sent to Anthropic's API. The UI shows which engine produced every report and every finding.
+- **Disclosure:** with AI on, content text, images and the retrieved guideline excerpts are sent to the configured provider. Free tiers (e.g. Gemini's) may let the provider use submitted data to improve its products, so sensitive material should be marked Confidential (never sent) or reviewed with local Ollama. The UI shows which engine produced every report and every finding.
 - **Confidential mode:** content marked confidential is never sent to an external service; only local rule checks run.
 - **Secrets:** the API key is read from `.env` on the server only and is never sent to the browser. `.env` is git-ignored.
 - **Human control:** AI never edits content. Approving with open critical or high findings needs a written override, which is stored in the approval record. Guideline changes proposed by the system need admin approval and are versioned.
@@ -107,7 +116,7 @@ No templates or boilerplate were used. Demo images and the brand-book PDF are ge
 - Rule-based rewrites are simple substitutions; better rewrites come from Claude when enabled.
 - Demo identity uses a user switcher, not real authentication. Production needs SSO and per-tenant isolation.
 - The integrity hash lives in the same database. Production should anchor it externally (e.g. a signed log).
-- The Claude integration is implemented against the official SDK but **has not been exercised with a live API key in this build**. Run `INKLOOM_TEST_NO_AI=0 python scripts/smoke_test.py` with a key to verify it.
+- The AI integrations **have not been exercised with a live key in this build**. The OpenAI-compatible path is verified against a local mock server only; model names on free tiers change often, so override `INKLOOM_MODEL` if a provider rejects the default.
 
 ## Roadmap
 

@@ -22,7 +22,7 @@ export async function render(view, ctx) {
           <p class="ink2" style="margin-top:0">Paste an original and a modified version. Both are scored by the same engine, and every point of difference is traced to a finding.</p>
           <div class="field"><label class="f">Original</label><textarea class="textarea" id="da" style="min-height:90px">${esc(SAMPLE_A)}</textarea></div>
           <div class="field"><label class="f">Modified</label><textarea class="textarea" id="db" style="min-height:90px">${esc(SAMPLE_B)}</textarea></div>
-          <div class="row">${ctx.status.ai_configured ? `<label class="toggle small"><input type="checkbox" id="dai"><span class="sl"></span>Include Claude review (slower)</label>` : `<span class="small muted">${icon("cpu", "sm")} Rule engine scoring</span>`}
+          <div class="row">${ctx.status.ai_configured ? `<label class="toggle small"><input type="checkbox" id="dai"><span class="sl"></span>Include AI review (slower)</label>` : `<span class="small muted">${icon("cpu", "sm")} Rule engine scoring</span>`}
             <button class="btn primary right" id="run">${icon("play", "sm")} Compare</button></div>
         </div></div>
         <div id="dna"></div>
@@ -63,7 +63,7 @@ function insight(i, admin) {
   return `<div class="finding ${i.status === "open" ? "high" : ""}"><div class="row wrap"><span class="src id">${esc(i.guideline_id)}</span><b>${esc(i.title)}</b>${st}<span class="pill indigo right">${i.count} submissions</span></div>
     <p class="expl">${esc(i.description)}</p>
     ${i.examples.length ? `<div class="row wrap" style="gap:4px;margin-top:6px">${i.examples.slice(0, 6).map((x) => `<span class="quote">${esc(x)}</span>`).join("")}</div>` : ""}
-    ${i.suggestion ? `<details class="ev" ${i.status === "open" ? "open" : ""}><summary>${icon("wand-2", "sm")} Proposed guideline (${i.suggestion.engine === "ai" ? "Claude" : "template"})</summary><div class="src" style="white-space:pre-wrap">${esc(i.suggestion.text)}</div></details>` : ""}
+    ${i.suggestion ? `<details class="ev" ${i.status === "open" ? "open" : ""}><summary>${icon("wand-2", "sm")} Proposed guideline (${i.suggestion.engine === "ai" ? "AI" : "template"})</summary><div class="src" style="white-space:pre-wrap">${esc(i.suggestion.text)}</div></details>` : ""}
     ${i.status === "open" && admin ? `<div class="f-actions">${i.suggestion ? `<button class="btn sm good" data-approve="${i.id}">${icon("check", "sm")} Review & approve</button>` : `<button class="btn sm primary" data-propose="${i.id}">${icon("sparkles", "sm")} Propose clearer guideline</button>`}
       <button class="btn sm ghost" data-dismiss="${i.id}">Dismiss</button></div>` : i.status === "open" ? `<div class="small muted" style="margin-top:8px">Only a Brand Admin can change guidelines.</div>` : ""}
   </div>`;

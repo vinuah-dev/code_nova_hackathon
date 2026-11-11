@@ -145,7 +145,7 @@ function scoreCard(rep, a) {
         <div class="row wrap"><h2>${band(a.score)}</h2>
           ${d != null && d !== 0 ? `<span class="delta ${d > 0 ? "up" : "down"}">${d > 0 ? "▲ +" : "▼ "}${d} vs v${prev.version}</span>` : ""}</div>
         <div class="row wrap small" style="margin:6px 0 10px">
-          <span class="pill ${aiMode ? "violet" : "medium"}">${icon(aiMode ? "sparkles" : "cpu", "sm")} ${aiMode ? "Claude + rule engine" : "Rule engine"}</span>
+          <span class="pill ${aiMode ? "violet" : "medium"}">${icon(aiMode ? "sparkles" : "cpu", "sm")} ${aiMode ? "AI + rule engine" : "Rule engine"}</span>
           <span class="muted">${a.findings.length} findings · ${ago(a.created_at)}</span>
         </div>
         ${a.score_after_review !== a.score ? `<div class="small ink2">Excluding findings marked false positive: <b>${Math.round(a.score_after_review)}</b></div>` : ""}
@@ -184,7 +184,7 @@ function finding(f, ctx) {
   const hasRep = sug && sug.replacement != null && (f.start != null || f.target === "alt_text");
   return `<div class="finding ${f.severity} ${f.decision ? "dec-" + f.decision : ""}" id="f-${f.id}" data-card="${f.id}">
     <div class="row wrap" style="gap:6px">${sevPill(f.severity)}<span class="pill">${icon(CAT_ICON[f.category] || "dot", "sm")} ${CAT[f.category] || f.category}</span>
-      <span class="pill ${f.engine === "ai" ? "violet" : "indigo"}" title="${f.engine === "ai" ? "Found by Claude, grounded in retrieved sources" : "Deterministic rule"}">${f.engine === "ai" ? "AI" : "Rule"}</span>
+      <span class="pill ${f.engine === "ai" ? "violet" : "indigo"}" title="${f.engine === "ai" ? "Found by the AI model, grounded in retrieved sources" : "Deterministic rule"}">${f.engine === "ai" ? "AI" : "Rule"}</span>
       ${f.engine === "ai" && !f.grounded ? `<span class="pill medium" title="The AI did not cite an approved source; treat as advisory">Ungrounded</span>` : ""}
       <span class="conf right" title="Confidence">${Math.round((f.confidence || 0) * 100)}%<span class="bar-track"><span class="bar-fill" style="display:block;width:${(f.confidence || 0) * 100}%"></span></span></span>
     </div>
