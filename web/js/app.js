@@ -1,5 +1,6 @@
 import { api, session } from "./api.js";
-import { $, esc, icon, icons, initials, toast } from "./ui.js";
+import { $, $$, esc, icon, icons, initials, toast } from "./ui.js";
+import { animateIn, isMobile, sheet } from "./motion.js";
 
 const NAV = [
   ["dashboard", "Dashboard", "layout-dashboard", "#/"],
@@ -10,6 +11,15 @@ const NAV = [
   ["intelligence", "Brand Intelligence", "sparkles", "#/intelligence"],
   ["settings", "Settings", "settings", "#/settings"],
 ];
+// Mobile bottom bar: 4 primary destinations + a centre "create" button + More.
+const MOBILE_TABS = [
+  ["dashboard", "Home", "layout-dashboard", "#/"],
+  ["reports", "Reports", "shield-check", "#/reports"],
+  ["new", "", "plus", "#/studio/new"],
+  ["approvals", "Approvals", "stamp", "#/approvals"],
+  ["more", "More", "menu", null],
+];
+const SHORT = { dashboard: "Dashboard", brand: "Brand Brain", studio: "Studio", reports: "Reports", approvals: "Approvals", intelligence: "Intelligence", settings: "Settings" };
 
 const ROUTES = [
   [/^\/?$/, "dashboard", "dashboard"],
@@ -23,7 +33,7 @@ const ROUTES = [
   [/^\/settings$/, "settings", "settings"],
 ];
 
-export const ctx = { users: [], me: null, status: null, pending: 0 };
+export const ctx = { users: [], me: null, status: null, pending: 0, nav: "dashboard" };
 
 async function loadShell() {
   [ctx.users, ctx.status] = await Promise.all([api("/api/users"), api("/api/status")]);
@@ -31,30 +41,81 @@ async function loadShell() {
   ctx.me = ctx.users.find((u) => u.id === session.userId);
   const sel = $("#user-select");
   sel.innerHTML = ctx.users.map((u) => `<option value="${u.id}" ${u.id === ctx.me.id ? "selected" : ""}>${esc(u.name)} — ${esc(u.title)}</option>`).join("");
-  sel.onchange = () => { session.userId = sel.value; ctx.me = ctx.users.find((u) => u.id === sel.value); paintMe(); toast(`Now acting as ${ctx.me.name} (${ctx.me.role})`); route(); };
+  sel.onchange = () => switchUser(sel.value);
   paintMe();
   const ai = ctx.status.ai_configured;
   $("#ai-pill").innerHTML = ai
-    ? `<span class="pill violet" title="Model: ${esc(ctx.status.model)}">${icon("sparkles", "sm")} ${esc(ctx.status.provider_label)} + Rules</span>`
-    : `<span class="pill medium" title="Set ANTHROPIC_API_KEY to enable AI review">${icon("cpu", "sm")} Rule engine mode</span>`;
+    ? `<span class="pill violet glow" title="Model: ${esc(ctx.status.model)}">${icon("sparkles", "sm")} ${esc(ctx.status.provider_label)} + Rules</span>`
+    : `<span class="pill medium" title="Add an AI key to enable AI review">${icon("cpu", "sm")} Rule engine mode</span>`;
   $("#side-foot").innerHTML = `<div class="row"><span class="dot ${ai ? "on" : "off"}"></span><b>${ai ? "AI review on" : "AI review off"}</b></div>
-    <div style="margin-top:4px">${ai ? `Model <code>${esc(ctx.status.model)}</code>. Content marked confidential is never sent.` : "Deterministic checks only. Add an AI key in <code>.env</code> (free Gemini key works) to enable AI review."}</div>`;
+    <div style="margin-top:4px">${ai ? `${esc(ctx.status.provider_label)} · <code>${esc(ctx.status.model)}</code>. Confidential content is never sent.` : "Deterministic checks only. Add an AI key in <code>.env</code> (free Gemini key works) to enable AI review."}</div>`;
+  $("#m-ai").className = `dot ${ai ? "on" : "off"}`;
+  $("#m-avatar").onclick = openMeSheet;
+  window.addEventListener("resize", () => moveIndicator(), { passive: true });
+}
+
+function switchUser(id) {
+  session.userId = id;
+  ctx.me = ctx.users.find((u) => u.id === id);
+  $("#user-select").value = id;
+  paintMe();
+  toast(`Now acting as ${ctx.me.name} (${ctx.me.role})`);
+  route();
 }
 
 function paintMe() {
-  $("#me-avatar").textContent = initials(ctx.me.name);
-  $("#me-avatar").className = `avatar ${ctx.me.role}`;
+  for (const el of [$("#me-avatar"), $("#m-avatar")]) {
+    el.textContent = initials(ctx.me.name);
+    el.className = `avatar ${ctx.me.role}`;
+  }
   $("#me-name").textContent = ctx.me.name;
   $("#me-role").textContent = ctx.me.title;
 }
 
+function openMeSheet() {
+  const ai = ctx.status.ai_configured;
+  sheet({
+    title: "Switch user",
+    body: `<div class="banner ${ai ? "info" : "warn"}" style="margin-bottom:12px">${icon(ai ? "sparkles" : "cpu", "sm")}<div>${ai ? `AI review on · ${esc(ctx.status.provider_label)} <code>${esc(ctx.status.model)}</code>` : "Rule engine mode (no AI key)"}</div></div>
+      <div class="user-list">${ctx.users.map((u) => `<button class="user-row ${u.id === ctx.me.id ? "on" : ""}" data-u="${u.id}">
+        <div class="avatar ${u.role}">${initials(u.name)}</div><div class="who"><b>${esc(u.name)}</b><span>${esc(u.title)}</span></div>
+        ${u.id === ctx.me.id ? icon("check", "sm right") : ""}</button>`).join("")}</div>`,
+    onClick: (e, close) => { const b = e.target.closest("[data-u]"); if (b) { close(); switchUser(b.dataset.u); } },
+  });
+}
+
+function openMoreSheet() {
+  sheet({
+    title: "More",
+    body: `<div class="more-grid">${NAV.filter(([k]) => ["brand", "studio", "intelligence", "settings"].includes(k)).map(([k, l, ic, href]) =>
+      `<a class="more-tile ${ctx.nav === k ? "on" : ""}" href="${href}"><span class="ic">${icon(ic)}</span>${l}</a>`).join("")}</div>`,
+    onClick: (e, close) => { if (e.target.closest("a")) close(); },
+  });
+}
+
 async function paintNav(active) {
+  ctx.nav = active;
   try {
     const list = await api("/api/content");
     ctx.pending = list.filter((c) => c.status === "pending_approval").length;
   } catch { /* nav badge is optional */ }
-  $("#nav").innerHTML = NAV.map(([key, label, ic, href]) => `<a href="${href}" class="${key === active ? "active" : ""}">${icon(ic)}<span class="lbl">${label}</span>
+  $("#nav").innerHTML = `<span class="nav-ind" id="nav-ind"></span>` + NAV.map(([key, label, ic, href]) => `<a href="${href}" class="${key === active ? "active" : ""}" data-key="${key}">${icon(ic)}<span class="lbl">${label}</span>
     ${key === "approvals" && ctx.pending ? `<span class="count">${ctx.pending}</span>` : ""}</a>`).join("");
+  const mActive = ["dashboard", "reports", "approvals"].includes(active) ? active : "more";
+  $("#m-nav").innerHTML = `<span class="m-ind" id="m-ind"></span>` + MOBILE_TABS.map(([key, label, ic, href]) => key === "new"
+    ? `<a class="m-fab" href="${href}" aria-label="New content">${icon(ic)}</a>`
+    : `<a class="m-tab ${key === mActive ? "active" : ""}" ${href ? `href="${href}"` : `href="#" data-more`} data-key="${key}">
+        <span class="m-ic">${icon(ic)}${key === "approvals" && ctx.pending ? `<i class="m-badge">${ctx.pending}</i>` : ""}</span><span>${label}</span></a>`).join("");
+  $("#m-nav [data-more]").onclick = (e) => { e.preventDefault(); openMoreSheet(); };
+  icons();
+  moveIndicator();
+}
+
+function moveIndicator() {
+  const a = $("#nav a.active"), ind = $("#nav-ind");
+  if (a && ind) { ind.style.transform = `translateY(${a.offsetTop}px)`; ind.style.height = `${a.offsetHeight}px`; ind.style.opacity = 1; }
+  const t = $("#m-nav .m-tab.active"), mi = $("#m-ind");
+  if (t && mi) { mi.style.transform = `translateX(${t.offsetLeft + t.offsetWidth / 2 - 18}px)`; mi.style.opacity = 1; }
 }
 
 const pages = {};
@@ -64,6 +125,7 @@ async function page(name) {
 }
 
 let routeSeq = 0;
+let lastPath = null;
 export async function route() {
   const seq = ++routeSeq;
   const path = location.hash.replace(/^#/, "").split("?")[0] || "/";
@@ -76,11 +138,15 @@ export async function route() {
   paintNav(match.nav);
   const label = NAV.find((n) => n[0] === match.nav)?.[1] || "";
   $("#crumbs").innerHTML = `Voltaro Mobility <span>/</span> <b>${label}</b>`;
+  $("#m-title").textContent = match.params.mode === "new" ? "New content" : SHORT[match.nav] || "";
   const view = $("#view");
   view.onclick = null;
   view.onchange = null;
   view.oninput = null;
-  view.innerHTML = `<div class="stack"><div class="skeleton" style="width:240px;height:26px"></div><div class="skeleton" style="height:120px"></div><div class="skeleton" style="height:240px"></div></div>`;
+  const samePage = path === lastPath;
+  lastPath = path;
+  if (!samePage) view.classList.remove("enter");
+  if (!samePage) view.innerHTML = `<div class="stack"><div class="skeleton" style="width:240px;height:26px"></div><div class="skeleton" style="height:120px"></div><div class="skeleton" style="height:240px"></div></div>`;
   try {
     const mod = await page(match.name);
     if (seq !== routeSeq) return;
@@ -89,10 +155,21 @@ export async function route() {
     console.error(e);
     view.innerHTML = `<div class="banner bad">${icon("alert-triangle", "sm")}<div><b>Something went wrong.</b> ${esc(e.message)}</div></div>`;
   }
+  if (seq !== routeSeq) return;
   icons();
+  if (!samePage) {
+    window.scrollTo({ top: 0 });
+    animateIn(view);
+  } else {
+    animateIn(view, { quiet: true });
+  }
 }
 
-export function crumbs(html) { $("#crumbs").innerHTML = html; }
+export function crumbs(html) {
+  $("#crumbs").innerHTML = html;
+  const last = $$("#crumbs b").pop();
+  if (last && isMobile()) $("#m-title").textContent = last.textContent;
+}
 
 window.addEventListener("hashchange", route);
 loadShell().then(route).catch((e) => {

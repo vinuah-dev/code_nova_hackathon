@@ -67,7 +67,7 @@ export function ring(score, size = 132) {
   const r = (size - 14) / 2, c = 2 * Math.PI * r, off = c * (1 - (score || 0) / 100);
   return `<div class="ring" style="width:${size}px;height:${size}px">
     <svg width="${size}" height="${size}"><circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="var(--line-2)" stroke-width="11"/>
-    <circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="${scoreColor(score)}" stroke-width="11" stroke-linecap="round" stroke-dasharray="${c}" stroke-dashoffset="${off}" style="transition:stroke-dashoffset .8s"/></svg>
+    <circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="${scoreColor(score)}" stroke-width="11" stroke-linecap="round" stroke-dasharray="${c}" stroke-dashoffset="${off}" data-off="${off}" style="transition:stroke-dashoffset .8s"/></svg>
     <div class="num"><div><b>${Math.round(score)}</b><span>/ 100</span></div></div></div>`;
 }
 
