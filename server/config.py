@@ -29,7 +29,7 @@ def load_env() -> None:
 # /chat/completions protocol, which Gemini, Groq, OpenRouter and Ollama all expose.
 PRESETS = {
     "anthropic": {"label": "Claude", "model": "claude-opus-5-5", "base_url": None},
-    "gemini": {"label": "Gemini", "model": "gemini-3.5-flash", "fallback": "gemini-3.5-flash-lite", "base_url": "https://generativelanguage.googleapis.com/v1beta/openai"},
+    "gemini": {"label": "Gemini", "model": "gemini-3.5-flash", "fallback": "gemini-3.5-flash-lite", "reasoning": "low", "base_url": "https://generativelanguage.googleapis.com/v1beta/openai"},
     "groq": {"label": "Groq", "model": "meta-llama/llama-4-scout-17b-16e-instruct", "base_url": "https://api.groq.com/openai/v1"},
     "openrouter": {"label": "OpenRouter", "model": "google/gemini-2.5-flash", "base_url": "https://openrouter.ai/api/v1"},
     "ollama": {"label": "Ollama (local)", "model": "llama3.2-vision", "base_url": "http://localhost:11434/v1"},
@@ -58,6 +58,22 @@ def model() -> str:
 
 def fallback_model() -> str | None:
     return os.environ.get("INKLOOM_FALLBACK_MODEL") or PRESETS[provider()].get("fallback")
+
+
+def reasoning_effort() -> str | None:
+    """Thinking depth for OpenAI-compatible providers that support it (Gemini: low keeps reviews fast)."""
+    v = os.environ.get("INKLOOM_REASONING_EFFORT")
+    if v is not None:
+        return v or None
+    return PRESETS[provider()].get("reasoning")
+
+
+def ai_budget_seconds() -> float:
+    """Total time one AI review may take (all retries) before falling back to the rule report."""
+    try:
+        return float(os.environ.get("INKLOOM_AI_BUDGET", "40"))
+    except ValueError:
+        return 40.0
 
 
 def base_url() -> str | None:

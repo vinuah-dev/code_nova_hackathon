@@ -120,18 +120,26 @@ def _call_openai_compatible(system: str, content: list, schema: dict, max_tokens
                 parts.append({"type": "text", "text": "(image omitted: this model is configured without image input)"})
     sys_prompt = (system + "\n\nRespond with ONE JSON object only, no prose, matching this JSON Schema:\n"
                   + json.dumps(schema))
-    # Free tiers are often busy (503/429/timeouts): retry once, then try the fallback model.
+    # Free tiers are often busy (503/429/timeouts): primary model, then the fallback, then the primary
+    # again, all inside one time budget so a reviewer never waits minutes. Out of time = rule report.
     models = [config.model()] + [m for m in [config.fallback_model()] if m and m != config.model()]
-    attempts = [(m, n) for m in models for n in range(2)]
+    attempts = (models + models)[:3]
+    deadline = time.monotonic() + config.ai_budget_seconds()
     data, last = None, None
-    for i, (model, _) in enumerate(attempts):
+    for i, model in enumerate(attempts):
+        remaining = deadline - time.monotonic()
+        if remaining < 5:
+            last = last or AIUnavailable("AI took too long")
+            break
         body = {"model": model, "max_tokens": max_tokens, "temperature": 0.2,
                 "response_format": {"type": "json_object"},
                 "messages": [{"role": "system", "content": sys_prompt}, {"role": "user", "content": parts}]}
+        if config.reasoning_effort():
+            body["reasoning_effort"] = config.reasoning_effort()
         req = urllib.request.Request(config.base_url() + "/chat/completions", data=json.dumps(body).encode("utf-8"), method="POST",
                                      headers={"Content-Type": "application/json", "Authorization": f"Bearer {config.api_key()}"})
         try:
-            with urllib.request.urlopen(req, timeout=90) as r:
+            with urllib.request.urlopen(req, timeout=min(20, remaining)) as r:
                 data = json.loads(r.read().decode("utf-8"))
             break
         except urllib.error.HTTPError as e:
@@ -143,9 +151,9 @@ def _call_openai_compatible(system: str, content: list, schema: dict, max_tokens
             last = AIUnavailable("Rate limited by the AI service (free-tier limit?)" if e.code == 429
                                  else f"AI service busy ({e.code}); tried {', '.join(models)}")
         except (urllib.error.URLError, TimeoutError, OSError):
-            last = AIUnavailable("Could not reach the AI service (timeout)")
+            last = AIUnavailable("AI service did not answer in time")
         if i < len(attempts) - 1:
-            time.sleep(1.5)
+            time.sleep(1.0)
     if data is None:
         raise last or AIUnavailable("AI service unavailable")
     try:

@@ -5,3 +5,6 @@ data/
 !data/.gitkeep
 
 .vercel
+
+# Submission documents (contain team phone numbers; keep out of the public repo)
+docs/

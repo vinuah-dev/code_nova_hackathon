@@ -14,6 +14,7 @@ export async function render(view, ctx) {
     <div class="page-head"><div><h1>Good to see you, ${esc(ctx.me.name.split(" ")[0])}</h1>
       <div class="sub">Brand health for <b>Voltaro Mobility</b> <span class="tag-demo">fictional demo org</span>. Seeded submissions were scored by the real rule engine.</div></div>
       <div class="actions"><a class="btn" href="#/intelligence">${icon("sparkles", "sm")} Brand Intelligence</a><a class="btn primary" href="#/studio/new">${icon("plus", "sm")} Review new content</a></div></div>
+    ${startCard()}
     <div class="grid g6" style="margin-bottom:16px">
       ${kpi("gauge", "Avg. compliance", an.overall_score == null ? "—" : `${Math.round(an.overall_score)}<small>/100</small>`, `${an.reviewed} reviewed items`, "#/reports")}
       ${kpi("files", "Submissions", an.submissions, `${an.ai_share}% reviewed with AI`, "#/studio")}
@@ -46,5 +47,37 @@ export async function render(view, ctx) {
         <table class="t"><tbody>${recent.map((c) => `<tr class="click" data-href="#/reports/${c.id}"><td>${scoreBadge(c.score)}</td><td><b>${esc(c.title)}</b><div class="small muted">${esc(c.channel || "")} · ${esc(c.owner || "")}</div></td><td class="small"><span class="pill st-${c.status}">${esc(c.status_label)}</span></td><td class="muted small">${ago(c.updated_at)}</td></tr>`).join("")}</tbody></table>
       </div></div>
     </div>`;
-  view.onclick = (e) => { const tr = e.target.closest("tr[data-href]"); if (tr) location.hash = tr.dataset.href; };
+  view.onclick = async (e) => {
+    const x = e.target.closest("[data-start-hide]");
+    if (x) { try { localStorage.setItem(HIDE, "1"); } catch { /* private mode */ } x.closest(".start-card").remove(); return; }
+    const t = e.target.closest("[data-try],[data-go-as]");
+    if (t) {
+      const { switchUser } = await import("../app.js");
+      if (t.dataset.try) {
+        // One click: become the Creator, load a sample with deliberate mistakes and run the review.
+        if (!ctx.status.permissions.create.includes(ctx.me.role)) await switchUser("u-creator");
+        location.hash = `#/studio/new?type=${t.dataset.try}&sample=1&run=1`;
+      } else {
+        await switchUser(t.dataset.goAs);
+        location.hash = t.dataset.href;
+      }
+      return;
+    }
+    const tr = e.target.closest("tr[data-href]"); if (tr) location.hash = tr.dataset.href;
+  };
+}
+
+const HIDE = "inkloom.start.hidden";
+function startCard() {
+  try { if (localStorage.getItem(HIDE)) return ""; } catch { /* show it */ }
+  return `<div class="card start-card"><div class="card-h"><h2>${icon("rocket", "sm")} Start here: the whole workflow in 3 minutes</h2>
+      <button class="btn ghost sm right" data-start-hide aria-label="Hide this guide">${icon("x", "sm")}</button></div>
+    <div class="card-b"><div class="start-steps">
+      <div class="start-step"><span class="n">1</span><b>Submit content for review</b><span class="small muted">Pick a sample with deliberate brand mistakes. It is reviewed against the Brand Brain straight away.</span>
+        <div class="acts"><button class="btn sm primary" data-try="ad">${icon("megaphone", "sm")} Ad</button><button class="btn sm" data-try="email">${icon("mail", "sm")} Email</button>
+        <button class="btn sm" data-try="post">${icon("image", "sm")} Poster</button><button class="btn sm" data-try="doc">${icon("file-text", "sm")} PDF</button></div></div>
+      <div class="start-step"><span class="n">2</span><b>Read why, fix it, submit</b><span class="small muted">Every issue shows the rule it breaks and a suggested correction. Accept or reject each, apply the fixes, then submit for approval.</span></div>
+      <div class="start-step"><span class="n">3</span><b>A human approves</b><span class="small muted">Switch to the Approver to approve or reject. The approved version is sealed with SHA-256.</span>
+        <div class="acts"><button class="btn sm" data-go-as="u-approver" data-href="#/approvals">${icon("stamp", "sm")} Approve as Vikram</button></div></div>
+    </div></div></div>`;
 }

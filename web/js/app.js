@@ -44,6 +44,7 @@ async function loadShell() {
   ctx.status = status;
   paintMe();
   const ai = ctx.status.ai_configured;
+  window.__inkloomAI = ai ? ctx.status.provider_label : null;
   $("#ai-pill").innerHTML = ai
     ? `<span class="pill violet glow" title="Model: ${esc(ctx.status.model)}">${icon("sparkles", "sm")} ${esc(ctx.status.provider_label)} + Rules</span>`
     : `<span class="pill medium" title="Add an AI key to enable AI review">${icon("cpu", "sm")} Rule engine mode</span>`;
@@ -54,7 +55,7 @@ async function loadShell() {
   $("#me-btn").onclick = openMeSheet;
 }
 
-async function switchUser(id) {
+export async function switchUser(id) {
   try {
     const r = await api("/api/auth/demo-login", { method: "POST", body: { user_id: id } });
     ctx.me = r.user;

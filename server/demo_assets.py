@@ -124,6 +124,24 @@ BRAND_BOOK = [
      ],
 ]
 
+# A dealer brochure with deliberate mistakes, for the "Document" sample in Content Studio.
+DEALER_BROCHURE = [
+    ["# Voltaro Glide-S1 - Dealer Brochure (fictional demo, draft from an agency)",
+     "",
+     "# Why riders love it",
+     "The Glide-S1 is the fastest electric scooter in India and the cheapest way to beat traffic.",
+     "Ride up to 110 km on a single charge and reach a top speed of 80 km/h.",
+     "Every scooter comes with a 5 years battery warranty, guaranteed.",
+     "",
+     "# Charging",
+     "Charge 0-80% in 60 minutes with the Voltaro Fast Charger at any dealer.",
+     "",
+     "# Offer",
+     "Festive dhamaka offer valid till 31 Oct 2025. Hurry, stocks are limited!!",
+     "Click here to find your nearest dealer.",
+     ],
+]
+
 DIWALI_CAPTION = ("Meet the all-new VoltaroGlide S1 — India's fastest electric scooter!! Get 150 km on a single charge, "
                   "GUARANTEED. Zero maintenance and an unbeatable price make it a total no-brainer. "
                   "Offer valid till 31 Dec 2025. Click here to book your ride! #voltaroglidediwali")
@@ -135,7 +153,8 @@ def generate(brand_dir: Path, demo_dir: Path) -> dict:
     brand_dir.mkdir(parents=True, exist_ok=True)
     logo = brand_dir / "voltaro_logo_primary.png"
     official_logo(logo)
-    needed = ["logo_used_in_poster.png", "diwali_poster.png", "Voltaro_Brand_Book_2026.pdf", "diwali_caption.txt", "voltaro_logo_primary.png"]
+    needed = ["logo_used_in_poster.png", "diwali_poster.png", "Voltaro_Brand_Book_2026.pdf", "diwali_caption.txt", "voltaro_logo_primary.png",
+              "Voltaro_Dealer_Brochure_draft.pdf"]
     if all((demo_dir / n).exists() for n in needed):
         return {"logo": logo}
     try:
@@ -144,6 +163,7 @@ def generate(brand_dir: Path, demo_dir: Path) -> dict:
         misused_logo(bad, logo)
         poster(demo_dir / "diwali_poster.png", bad)
         brand_book_pdf(demo_dir / "Voltaro_Brand_Book_2026.pdf", BRAND_BOOK)
+        brand_book_pdf(demo_dir / "Voltaro_Dealer_Brochure_draft.pdf", DEALER_BROCHURE)
         (demo_dir / "diwali_caption.txt").write_text(DIWALI_CAPTION, encoding="utf-8")
         import shutil
         shutil.copy(logo, demo_dir / "voltaro_logo_primary.png")

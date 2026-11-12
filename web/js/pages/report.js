@@ -38,6 +38,7 @@ export async function render(view, ctx, { id }) {
       <div class="actions" id="actions"></div>
     </div>
     ${flow(c.status)}
+    ${isCurrent ? nextStep(ctx, rep) : ""}
     ${!isCurrent ? `<div class="banner warn" style="margin:14px 0">${icon("history", "sm")}<div>You are viewing an older version. Actions apply to the current version (v${c.current_version}).</div></div>` : ""}
     ${detail.alerts.some((x) => !x.resolved) ? `<div class="banner bad" style="margin:14px 0">${icon("shield-alert", "sm")}<div><b>Integrity Shield:</b> this content changed after approval. It no longer matches the SHA-256 recorded when it was approved and must be reviewed again. <a href="#/approvals?tab=integrity">See what changed</a></div></div>` : ""}
     <div style="height:14px"></div>
@@ -48,7 +49,58 @@ export async function render(view, ctx, { id }) {
   `;
   paintActions(ctx, rep, detail, isCurrent);
   wire(view, ctx, rep, detail);
+  $("#next", view)?.addEventListener("click", async (e) => {
+    const b = e.target.closest("[data-as]");
+    if (!b) return;
+    const { switchUser } = await import("../app.js");
+    await switchUser(b.dataset.as);
+  });
   icons();
+  if (params.get("run") && !a && can(ctx, "review")) {
+    history.replaceState(null, "", `#/reports/${id}`);
+    runReview(id);
+  }
+}
+
+// One plain sentence telling whoever is looking what to do next, so the workflow needs no walkthrough.
+const ROLE_USER = { creator: ["u-creator", "Rohan (Creator)"], manager: ["u-manager", "Meera (Manager)"], approver: ["u-approver", "Vikram (Approver)"] };
+function nextStep(ctx, rep) {
+  const c = rep.content, a = rep.analysis, st = c.status, role = ctx.me.role;
+  const sw = (r) => role === r ? "" : `<button class="btn sm" data-as="${ROLE_USER[r][0]}">${icon("repeat", "sm")} Switch to ${ROLE_USER[r][1]}</button>`;
+  let title = "", text = "", acts = "";
+  if (!a) {
+    title = "Next: run the brand review";
+    text = "Checks the content against the Brand Brain and explains every issue with the rule it breaks.";
+  } else if (["draft", "ai_review", "needs_revision", "modified_after_approval"].includes(st)) {
+    const open = a.findings.filter((f) => !f.decision).length;
+    const accepted = a.findings.filter((f) => f.decision === "accepted" && f.suggestion?.replacement != null && (f.start != null || f.target === "alt_text")).length;
+    if (!can(ctx, "edit")) {
+      title = "Waiting for the creator";
+      text = "The creator accepts or rejects each finding, applies the fixes and submits for approval.";
+      acts = sw("creator");
+    } else if (open) {
+      title = `Step 1 of 3: decide on each finding (${open} left)`;
+      text = "Accept fix to use the suggested correction, or Reject if it is a false positive. Accept all text fixes does it in one click.";
+    } else if (accepted) {
+      title = "Step 2 of 3: apply the accepted fixes";
+      text = `Apply ${accepted} accepted fix${accepted > 1 ? "es" : ""} (button above) to create a corrected new version. The original is kept.`;
+    } else {
+      title = "Step 3 of 3: submit for approval";
+      text = "Send it to the manager and approver. A person always makes the final decision.";
+    }
+  } else if (st === "pending_approval") {
+    if (can(ctx, "approve")) { title = "Your decision: approve or reject"; text = "Approving seals this version with SHA-256. Approving with serious open issues needs a written reason."; }
+    else if (can(ctx, "endorse")) { title = "Endorse or request changes"; text = "Final approval belongs to the Approver."; acts = sw("approver"); }
+    else { title = "Waiting for approval"; text = "A manager can endorse it and an approver gives the final sign-off."; acts = sw("manager") + sw("approver"); }
+  } else if (st === "approved") {
+    title = "Approved and sealed";
+    text = "The approved version has a SHA-256 seal. Edit it and the Integrity Shield flags the change as Modified after approval.";
+  } else if (st === "rejected") {
+    title = "Rejected";
+    text = "Edit the content and run the review again to resubmit.";
+    acts = can(ctx, "edit") ? "" : sw("creator");
+  }
+  return title ? `<div class="next-step" id="next"><div class="ic">${icon("compass", "sm")}</div><div><b>${title}</b><div class="small">${text}</div>${acts ? `<div class="acts">${acts}</div>` : ""}</div></div>` : "";
 }
 
 function flow(status) {
@@ -256,11 +308,15 @@ function paintActions(ctx, rep, detail, isCurrent) {
 }
 
 function progress() {
-  const steps = ["Extracting text, PDF and image data", "Retrieving approved brand sources (BM25 over the Brand Brain)", "Running deterministic rule checks", "Claude review grounded in retrieved sources", "Scoring and saving the report"];
+  const ai = window.__inkloomAI;
+  const steps = ["Extracting text, PDF and image data", "Retrieving approved brand sources (BM25 over the Brand Brain)", "Running deterministic rule checks",
+    ai ? `${ai} review grounded in retrieved sources (up to ~40 s)` : "AI review skipped: rule engine mode", "Scoring and saving the report"];
   const ov = document.createElement("div");
   ov.className = "overlay";
-  ov.innerHTML = `<div class="modal" style="width:min(480px,100%)"><div class="modal-b"><h2>Reviewing against the Brand Brain</h2><div class="steps">${steps.map((s, i) => `<div class="s" data-s="${i}"><span class="spin" style="visibility:hidden"></span>${s}</div>`).join("")}</div></div></div>`;
+  ov.innerHTML = `<div class="modal" style="width:min(480px,100%)"><div class="modal-b"><h2>Reviewing against the Brand Brain</h2><div class="steps">${steps.map((s, i) => `<div class="s" data-s="${i}"><span class="spin" style="visibility:hidden"></span>${s}</div>`).join("")}</div><div class="small muted" data-el style="margin-top:10px">0 s</div></div></div>`;
   document.body.appendChild(ov);
+  const t0 = Date.now();
+  const el = setInterval(() => { const n = Math.round((Date.now() - t0) / 1000); ov.querySelector("[data-el]").textContent = `${n} s${n > 20 ? " · the free AI tier can be slow; the rule report is used if it does not answer in time" : ""}`; }, 1000);
   let i = 0;
   const tick = () => {
     $$(".s", ov).forEach((el, k) => {
@@ -271,7 +327,7 @@ function progress() {
   };
   tick();
   const t = setInterval(() => { if (i < 3) { i++; tick(); } }, 650);
-  return { done: () => { clearInterval(t); i = 5; tick(); setTimeout(() => ov.remove(), 250); } };
+  return { done: () => { clearInterval(t); clearInterval(el); i = 5; tick(); setTimeout(() => ov.remove(), 250); } };
 }
 
 async function runReview(id) {
