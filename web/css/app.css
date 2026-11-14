@@ -309,3 +309,4 @@ details.ev summary::-webkit-details-marker { display: none; }
 .start-step .n { width: 24px; height: 24px; border-radius: 50%; background: var(--primary); color: #fff; display: grid; place-items: center; font-weight: 700; font-size: 12px; }
 .start-step .acts { display: flex; gap: 6px; flex-wrap: wrap; margin-top: auto; padding-top: 6px; }
 @media (max-width: 760px) { .start-steps { grid-template-columns: minmax(0, 1fr); } }
+.start-step .acts .btn { white-space: normal; text-align: left; }

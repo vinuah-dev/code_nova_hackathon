@@ -307,13 +307,13 @@ function paintActions(ctx, rep, detail, isCurrent) {
   $("#actions").innerHTML = b.join("");
 }
 
-function progress() {
+function progress(title = "Reviewing against the Brand Brain") {
   const ai = window.__inkloomAI;
   const steps = ["Extracting text, PDF and image data", "Retrieving approved brand sources (BM25 over the Brand Brain)", "Running deterministic rule checks",
     ai ? `${ai} review grounded in retrieved sources (up to ~40 s)` : "AI review skipped: rule engine mode", "Scoring and saving the report"];
   const ov = document.createElement("div");
   ov.className = "overlay";
-  ov.innerHTML = `<div class="modal" style="width:min(480px,100%)"><div class="modal-b"><h2>Reviewing against the Brand Brain</h2><div class="steps">${steps.map((s, i) => `<div class="s" data-s="${i}"><span class="spin" style="visibility:hidden"></span>${s}</div>`).join("")}</div><div class="small muted" data-el style="margin-top:10px">0 s</div></div></div>`;
+  ov.innerHTML = `<div class="modal" style="width:min(480px,100%)"><div class="modal-b"><h2>${title}</h2><div class="steps">${steps.map((s, i) => `<div class="s" data-s="${i}"><span class="spin" style="visibility:hidden"></span>${s}</div>`).join("")}</div><div class="small muted" data-el style="margin-top:10px">0 s</div></div></div>`;
   document.body.appendChild(ov);
   const t0 = Date.now();
   const el = setInterval(() => { const n = Math.round((Date.now() - t0) / 1000); ov.querySelector("[data-el]").textContent = `${n} s${n > 20 ? " · the free AI tier can be slow; the rule report is used if it does not answer in time" : ""}`; }, 1000);
@@ -428,7 +428,9 @@ function wire(view, ctx, rep, detail) {
 }
 
 async function applyFixes(id, a) {
+  const p = progress("Applying your fixes and re-reviewing the new version");
   const r = await guard(() => api(`/api/content/${id}/apply-fixes`, { method: "POST", body: { analysis_id: a.id } }));
+  p.done();
   if (!r) return;
   const d = Math.round(r.after.score - r.before.score);
   await modal({
