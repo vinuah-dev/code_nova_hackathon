@@ -1,5 +1,6 @@
 import { api } from "../api.js";
-import { esc, guard, icon, modal, sevPill } from "../ui.js";
+import { ago, esc, guard, icon, modal, sevPill } from "../ui.js";
+import { openFeedback } from "../feedback.js";
 
 const PERM_LABEL = { brand: "Manage Brand Brain & guidelines", create: "Create content", edit: "Edit content / apply fixes / submit", review: "Run brand review",
   decide_fix: "Accept or reject findings", comment: "Comment", request_revision: "Request changes", endorse: "Endorse (manager review)", approve: "Final approve / reject" };
@@ -7,6 +8,8 @@ const PERM_LABEL = { brand: "Manage Brand Brain & guidelines", create: "Create c
 export async function render(view, ctx) {
   const s = ctx.status;
   const roles = ["admin", "creator", "manager", "approver"];
+  const admin = s.permissions.brand.includes(ctx.me.role);
+  const fb = admin ? await api("/api/feedback").catch(() => null) : null;
   view.innerHTML = `
     <div class="page-head"><div><h1>Settings</h1><div class="sub">AI configuration, privacy, roles and demo data.</div></div></div>
     <div class="grid g2" style="align-items:start">
@@ -24,7 +27,7 @@ export async function render(view, ctx) {
           <ul style="margin:0;padding-left:18px" class="kbd-list">
             <li><b>Disclosure:</b> with AI on, content text, images and retrieved guideline excerpts are sent to the configured AI provider (${esc(s.provider_label)}) for review. Free tiers (e.g. Gemini free) may let the provider use submitted data to improve its products, so use Confidential mode for sensitive material. Nothing is sent in rule-engine mode.</li>
             <li><b>Confidential content</b> (toggle in Content Studio) is never sent to any external service; only local rule checks run.</li>
-            <li>Brand assets, uploads and the database are stored locally in <code>data/</code>.</li>
+            <li>Content, uploads and the Brand Brain are stored in the app's own database (Supabase Postgres on the live site, SQLite locally); API keys stay on the server.</li>
             <li><b>Human control:</b> AI never edits content. Fixes apply only when a person accepts them, as a new version; the original is kept.</li>
             <li>Approving content with open serious findings requires a recorded override reason.</li>
             <li>Every finding shows its source, evidence and confidence. AI findings without a valid citation are labelled <i>Ungrounded</i> and down-weighted.</li>
@@ -32,6 +35,7 @@ export async function render(view, ctx) {
           </ul></div></div>
       </div>
       <div class="stack">
+        ${feedbackCard(fb, admin)}
         <div class="card"><div class="card-h"><h2>${icon("users", "sm")} Roles & permissions</h2></div><div class="card-b" style="overflow-x:auto">
           <table class="t keep"><thead><tr><th>Action</th>${roles.map((r) => `<th>${r}</th>`).join("")}</tr></thead><tbody>
           ${Object.entries(s.permissions).map(([p, rs]) => `<tr><td>${PERM_LABEL[p] || p}</td>${roles.map((r) => `<td>${rs.includes(r) ? `<span style="color:var(--good)">✓</span>` : `<span class="muted">—</span>`}</td>`).join("")}</tr>`).join("")}
@@ -44,9 +48,34 @@ export async function render(view, ctx) {
           <button class="btn danger" id="reset" ${s.permissions.brand.includes(ctx.me.role) ? "" : "disabled title='Admin only'"}>${icon("rotate-ccw", "sm")} Reset demo data</button></div></div>
       </div>
     </div>`;
+  view.querySelector("#fb-open")?.addEventListener("click", openFeedback);
   const b = view.querySelector("#reset");
   b.onclick = async () => {
     const ok = await modal({ title: "Reset all data?", body: `<p class="ink2">This deletes every content item, review, comment and Brand Brain change, then reloads the demo dataset. It cannot be undone.</p>`, actions: [{ label: "Cancel", value: false }, { label: "Reset", cls: "danger solid", value: true }] });
     if (ok && await guard(() => api("/api/admin/reset-demo", { method: "POST" }), "Demo data restored")) location.hash = "#/";
   };
+}
+
+function feedbackCard(fb, admin) {
+  const head = `<div class="card-h"><h2>${icon("message-square-heart", "sm")} User testing feedback</h2>
+    <div class="right row" style="gap:6px"><button class="btn sm" id="fb-open">${icon("plus", "sm")} Give feedback</button>
+    ${admin && fb?.summary.count ? `<a class="btn sm ghost" href="/api/feedback.csv" download>${icon("download", "sm")} CSV</a>` : ""}</div></div>`;
+  if (!admin) return `<div class="card">${head}<div class="card-b ink2">Testing Inkloom? Use <b>Give feedback</b> (or the Feedback button in the corner) to tell us what you tried and how it went. Brand admins see the results here.</div></div>`;
+  if (!fb) return `<div class="card">${head}<div class="card-b muted">Could not load feedback.</div></div>`;
+  const s = fb.summary;
+  if (!s.count) return `<div class="card">${head}<div class="card-b empty small">${icon("inbox")}<div>No feedback yet. Ask testers to press the Feedback button after each task.</div></div></div>`;
+  return `<div class="card">${head}<div class="card-b">
+    <div class="grid g4" style="gap:10px;margin-bottom:12px">
+      <div class="kpi"><div class="lbl">Responses</div><div class="val">${s.count}</div></div>
+      <div class="kpi"><div class="lbl">Testers</div><div class="val">${s.testers}</div></div>
+      <div class="kpi"><div class="lbl">Avg. ease</div><div class="val">${s.avg_rating}<small>/5</small></div></div>
+      <div class="kpi"><div class="lbl">Task completed</div><div class="val">${s.completed_share}<small>%</small></div></div>
+    </div>
+    <table class="t keep"><thead><tr><th>Task</th><th>Responses</th><th>Avg. ease</th><th>Completed</th></tr></thead><tbody>
+      ${s.by_task.map((t) => `<tr><td>${esc(t.task)}</td><td>${t.count}</td><td>${t.avg}/5</td><td>${t.completed_share}%</td></tr>`).join("")}</tbody></table>
+    <div class="section-lbl" style="margin-top:14px">Latest comments</div>
+    <div class="stack" style="gap:8px">${fb.rows.filter((r) => r.comment).slice(0, 8).map((r) => `<div class="src"><b>${esc(r.tester || r.user_name)}</b>
+      <span class="muted small">· ${esc(r.task)} · ${r.rating}/5 · ${esc(r.completed || "n/a")} · ${esc(r.device || "")} · ${ago(r.created_at)}</span>
+      <div class="ink2" style="margin-top:3px">${esc(r.comment)}</div></div>`).join("") || `<div class="muted small">No comments yet.</div>`}</div>
+  </div></div>`;
 }

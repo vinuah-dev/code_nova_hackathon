@@ -10,7 +10,7 @@ from collections import Counter, defaultdict
 from pathlib import Path
 
 from fastapi import Body, FastAPI, Header, HTTPException, Request
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
 
@@ -760,6 +760,69 @@ def insight_decide(iid: int, data: dict = Body(...), x_user_id: str | None = Hea
     except ValueError as e:
         raise HTTPException(400, str(e))
     return {"ok": True}
+
+
+# ---------------------------------------------------------------- user-testing feedback
+FEEDBACK_TASKS = ["Submit content for review", "Understand a finding", "Fix issues", "Approve content", "Set up the Brand Brain", "Other"]
+
+
+@app.post("/api/feedback")
+def feedback_add(data: dict = Body(...), x_user_id: str | None = Header(None)):
+    """Structured feedback from user tests: what the tester tried, a 1-5 rating, whether they managed it."""
+    u = user(x_user_id)
+    try:
+        rating = int(data.get("rating"))
+    except (TypeError, ValueError):
+        raise HTTPException(400, "Pick a rating from 1 to 5")
+    if not 1 <= rating <= 5:
+        raise HTTPException(400, "Pick a rating from 1 to 5")
+    task = data.get("task") if data.get("task") in FEEDBACK_TASKS else "Other"
+    completed = data.get("completed") if data.get("completed") in ("yes", "partly", "no") else None
+    fid = db.ex("INSERT INTO feedback(user_id, user_name, role, tester, page, task, rating, completed, comment, device, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                (u["id"], u["name"], u["role"], (data.get("tester") or "").strip()[:80] or None, (data.get("page") or "")[:120],
+                 task, rating, completed, (data.get("comment") or "").strip()[:2000], (data.get("device") or "")[:20], db.now()))
+    return {"id": fid}
+
+
+def _feedback_rows() -> list[dict]:
+    return db.q("SELECT * FROM feedback ORDER BY id DESC")
+
+
+@app.get("/api/feedback")
+def feedback_list(x_user_id: str | None = Header(None)):
+    need(user(x_user_id), "brand")
+    rows = _feedback_rows()
+    n = len(rows)
+    by_task = {}
+    for r in rows:
+        t = by_task.setdefault(r["task"], {"task": r["task"], "count": 0, "sum": 0, "done": 0})
+        t["count"] += 1
+        t["sum"] += r["rating"]
+        t["done"] += r["completed"] == "yes"
+    return {"tasks": FEEDBACK_TASKS, "rows": rows,
+            "summary": {"count": n, "avg_rating": round(sum(r["rating"] for r in rows) / n, 2) if n else None,
+                        "completed_share": round(sum(r["completed"] == "yes" for r in rows) / n * 100) if n else None,
+                        "testers": len({r["tester"] or r["user_id"] for r in rows}),
+                        "by_task": [{"task": t["task"], "count": t["count"], "avg": round(t["sum"] / t["count"], 2),
+                                     "completed_share": round(t["done"] / t["count"] * 100)} for t in by_task.values()]}}
+
+
+@app.get("/api/feedback.csv")
+def feedback_csv(x_user_id: str | None = Header(None)):
+    need(user(x_user_id), "brand")
+    import csv
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    cols = ["id", "created_at", "tester", "user_name", "role", "task", "rating", "completed", "comment", "page", "device"]
+    w.writerow(cols)
+    for r in reversed(_feedback_rows()):
+        w.writerow([r.get(c) if r.get(c) is not None else "" for c in cols])
+    return Response(buf.getvalue(), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=inkloom-user-feedback.csv"})
+
+
+@app.get("/api/feedback/tasks")
+def feedback_tasks():
+    return FEEDBACK_TASKS
 
 
 @app.get("/api/learning")

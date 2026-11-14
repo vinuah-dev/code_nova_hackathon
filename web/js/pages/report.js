@@ -49,6 +49,7 @@ export async function render(view, ctx, { id }) {
   `;
   paintActions(ctx, rep, detail, isCurrent);
   wire(view, ctx, rep, detail);
+  $("[data-print]")?.addEventListener("click", () => window.print());
   $("#next", view)?.addEventListener("click", async (e) => {
     const b = e.target.closest("[data-as]");
     if (!b) return;
@@ -303,6 +304,7 @@ function paintActions(ctx, rep, detail, isCurrent) {
     if (can(ctx, "request_revision")) b.push(`<button class="btn" data-revise>${icon("undo-2", "sm")} Request changes</button>`);
     if (can(ctx, "approve")) b.push(`<button class="btn danger" data-reject>${icon("x-circle", "sm")} Reject</button><button class="btn good" data-approve>${icon("stamp", "sm")} Approve</button>`);
   }
+  if (a) b.push(`<button class="btn" data-print title="Print or save this compliance report as PDF">${icon("printer", "sm")} Print / PDF</button>`);
   if (c.approved_hash) b.push(`<button class="btn" data-verify title="Recompute SHA-256 and compare">${icon("shield-check", "sm")} Verify integrity</button>`);
   $("#actions").innerHTML = b.join("");
 }

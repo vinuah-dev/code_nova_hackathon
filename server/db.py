@@ -103,10 +103,15 @@ CREATE TABLE IF NOT EXISTS ml_models (
   info TEXT, metrics TEXT, vocab TEXT, weights TEXT, reasons TEXT
 );
 CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value TEXT);
+CREATE TABLE IF NOT EXISTS feedback (
+  id INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT, user_name TEXT, role TEXT, tester TEXT, page TEXT, task TEXT,
+  rating INTEGER, completed TEXT, comment TEXT, device TEXT, created_at TEXT
+);
 CREATE TABLE IF NOT EXISTS blobs (name TEXT PRIMARY KEY, data BLOB, mime TEXT, created_at TEXT);
 """
 
 TABLES = re.findall(r"CREATE TABLE IF NOT EXISTS (\w+)", SCHEMA)
+KEEP_ON_RESET = {"feedback"}  # user-testing evidence survives "Reset demo data"
 SERIAL_TABLES = {t for t, body in re.findall(r"CREATE TABLE IF NOT EXISTS (\w+) \((.*?)\);", SCHEMA, flags=re.S) if "AUTOINCREMENT" in body}
 
 
@@ -273,11 +278,12 @@ def reset_all() -> None:
     with _lock:
         c = conn()
         if IS_PG:
-            c.execute("DROP TABLE IF EXISTS " + ", ".join(TABLES) + " CASCADE")
+            c.execute("DROP TABLE IF EXISTS " + ", ".join(t for t in TABLES if t not in KEEP_ON_RESET) + " CASCADE")
             c.execute(_pg_schema())
             return
         tables = [r["name"] for r in c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")]
         for t in tables:
-            c.execute(f"DROP TABLE IF EXISTS {t}")
+            if t not in KEEP_ON_RESET:
+                c.execute(f"DROP TABLE IF EXISTS {t}")
         c.commit()
         c.executescript(SCHEMA)

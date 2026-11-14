@@ -2,6 +2,7 @@ import { api } from "./api.js";
 import { $, $$, esc, icon, icons, initials, toast } from "./ui.js";
 import { animateIn, isMobile, sheet } from "./motion.js";
 import { showLogin } from "./login.js";
+import { openFeedback } from "./feedback.js";
 
 const NAV = [
   ["dashboard", "Dashboard", "layout-dashboard", "#/"],
@@ -53,6 +54,7 @@ async function loadShell() {
   $("#m-ai").className = `dot ${ai ? "on" : "off"}`;
   $("#m-avatar").onclick = openMeSheet;
   $("#me-btn").onclick = openMeSheet;
+  $("#fb-fab").onclick = openFeedback;
 }
 
 export async function switchUser(id) {
@@ -106,8 +108,9 @@ function openMoreSheet() {
   sheet({
     title: "More",
     body: `<div class="more-grid">${NAV.filter(([k]) => ["brand", "studio", "intelligence", "settings"].includes(k)).map(([k, l, ic, href]) =>
-      `<a class="more-tile ${ctx.nav === k ? "on" : ""}" href="${href}"><span class="ic">${icon(ic)}</span>${l}</a>`).join("")}</div>`,
-    onClick: (e, close) => { if (e.target.closest("a")) close(); },
+      `<a class="more-tile ${ctx.nav === k ? "on" : ""}" href="${href}"><span class="ic">${icon(ic)}</span>${l}</a>`).join("")}
+      <button class="more-tile" data-fb><span class="ic">${icon("message-square-heart")}</span>Feedback</button></div>`,
+    onClick: (e, close) => { if (e.target.closest("a")) close(); if (e.target.closest("[data-fb]")) { close(); openFeedback(); } },
   });
 }
 
