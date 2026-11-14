@@ -14,7 +14,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
 
-from . import analysis, auth, config, db, extract, gaps, integrity, learning, rag, scoring, storage, visual
+from . import analysis, auth, config, db, extract, gaps, integrity, learning, policy, rag, scoring, storage, visual
 from .config import UPLOAD_DIR, WEB_DIR
 
 config.load_env()
@@ -593,10 +593,14 @@ def submit(cid: int, data: dict = Body(default={}), x_user_id: str | None = Head
     u = user(x_user_id)
     need(u, "edit")
     c = content_or_404(cid)
-    if not analysis.latest(cid, c["current_version"]):
+    a = analysis.latest(cid, c["current_version"])
+    if not a:
         raise HTTPException(400, "Run the AI review on the latest version before submitting")
     if c["status"] not in ("ai_review", "needs_revision", "draft", "modified_after_approval"):
         raise HTTPException(400, f"Cannot submit from status '{STATUS_LABEL.get(c['status'])}'")
+    blocked = policy.check_submit(a)
+    if blocked:
+        raise HTTPException(409, blocked)
     set_status(c, "pending_approval", u["id"], "submitted", data.get("note") or "")
     return {"ok": True}
 
@@ -651,6 +655,9 @@ def approve(cid: int, data: dict = Body(default={}), x_user_id: str | None = Hea
     if c["status"] != "pending_approval":
         raise HTTPException(400, "Content must be submitted for approval first")
     a = analysis.latest(cid, c["current_version"])
+    blocked = policy.check_approve(cid, a)
+    if blocked:
+        raise HTTPException(409, blocked)
     open_serious = [f for f in (a["findings"] if a else []) if f["severity"] in ("critical", "high") and f.get("decision") != "rejected"]
     if open_serious and not (data.get("override_reason") or "").strip():
         raise HTTPException(409, f"{len(open_serious)} critical/high finding(s) are still open. Fix them, mark them as false positives, "
@@ -872,6 +879,57 @@ def health(x_user_id: str | None = Header(None)):
                         "fell_back_to_rules": sum(1 for r in tried if r["mode"] != "ai+rules"),
                         "median_ai_s": round(pct(0.5) / 1000, 1) if times else None, "p90_ai_s": round(pct(0.9) / 1000, 1) if times else None,
                         "last_error": next((r["ai_error"] for r in rows if r["ai_error"]), None)}}
+
+
+@app.get("/api/policy")
+def policy_get(x_user_id: str | None = Header(None)):
+    user(x_user_id)
+    return policy.get()
+
+
+@app.post("/api/policy")
+def policy_set(data: dict = Body(...), x_user_id: str | None = Header(None)):
+    u = user(x_user_id)
+    need(u, "brand")
+    try:
+        p = policy.save(data)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    event(None, u["id"], "policy_changed", None, None, db.j(p))
+    return p
+
+
+BULK_MAX, BULK_AI_MAX = 25, 5
+
+
+@app.post("/api/bulk-review")
+def bulk_review(data: dict = Body(...), x_user_id: str | None = Header(None)):
+    """Create and review many text items at once (e.g. a content calendar exported as CSV)."""
+    u = user(x_user_id)
+    need(u, "create")
+    rows = [r for r in (data.get("rows") or []) if isinstance(r, dict) and (r.get("body") or "").strip()]
+    if not rows:
+        raise HTTPException(400, "No rows with text to review. Each row needs at least a 'body' column.")
+    if len(rows) > BULK_MAX:
+        raise HTTPException(400, f"Up to {BULK_MAX} rows per batch (got {len(rows)}). Split the file and run it again.")
+    use_ai = bool(data.get("use_ai")) and len(rows) <= BULK_AI_MAX
+    out = []
+    for n, r in enumerate(rows, 1):
+        title = (r.get("title") or "").strip()[:120] or f"Bulk item {n}"
+        cid = create_content({"title": title, "channel": (r.get("channel") or "Social").strip()[:40], "body": r["body"],
+                              "alt_text": r.get("alt_text") or "", "confidential": not use_ai}, x_user_id)["id"]
+        res = analysis.run_for_content(cid, u["id"])
+        c = content_or_404(cid)
+        set_status(c, "ai_review", u["id"], "ai_review", f"Bulk review: score {res['score']} ({res['mode']})")
+        if not use_ai:  # rule-only batches are not confidential content; clear the flag used to skip the AI
+            db.ex("UPDATE content SET confidential=0 WHERE id=?", (cid,))
+        fs = res["findings"]
+        out.append({"id": cid, "title": title, "channel": c["channel"], "score": res["score"], "mode": res["mode"], "issues": len(fs),
+                    "serious": sum(1 for f in fs if f["severity"] in ("critical", "high")),
+                    "top": [f["title"] for f in sorted(fs, key=lambda f: ["critical", "high", "medium", "low"].index(f["severity"]))[:3]]})
+    scores = [o["score"] for o in out]
+    return {"items": out, "ai_used": use_ai, "summary": {"count": len(out), "avg_score": round(sum(scores) / len(scores), 1),
+            "ready": sum(1 for x in scores if x >= 85), "high_risk": sum(1 for x in scores if x < 60)}}
 
 
 @app.get("/api/feedback/tasks")

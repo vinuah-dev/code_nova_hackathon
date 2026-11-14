@@ -1,5 +1,5 @@
 import { api, fileToB64, guessMime } from "../api.js";
-import { $, ago, esc, guard, icon, icons, scoreBadge, statusPill, toast } from "../ui.js";
+import { $, ago, esc, guard, icon, icons, modal, scoreBadge, statusPill, toast } from "../ui.js";
 
 const CHANNELS = ["Instagram", "LinkedIn", "Website", "Email", "Blog", "WhatsApp", "Display ads", "Search ads", "Print", "Press release"];
 let files = [];
@@ -10,7 +10,7 @@ export async function render(view, ctx, params) {
   const list = await api("/api/content");
   view.innerHTML = `
     <div class="page-head"><div><h1>Content Studio</h1><div class="sub">Draft, upload and review content before it goes anywhere public.</div></div>
-      <div class="actions">${can ? `<a class="btn primary" href="#/studio/new">${icon("plus", "sm")} New content</a>` : `<span class="muted small">Switch to a Creator to add content</span>`}</div></div>
+      <div class="actions">${can ? `<button class="btn" id="bulk">${icon("table", "sm")} Bulk review (CSV)</button><a class="btn primary" href="#/studio/new">${icon("plus", "sm")} New content</a>` : `<span class="muted small">Switch to a Creator to add content</span>`}</div></div>
     <div class="card"><table class="t"><thead><tr><th>Content</th><th>Channel</th><th>Owner</th><th>Status</th><th>Score</th><th>Issues</th><th>Updated</th></tr></thead><tbody>
       ${list.map((c) => `<tr class="click" data-href="#/reports/${c.id}">
         <td><b>${esc(c.title)}</b> ${c.is_demo ? `<span class="tag-demo">demo</span>` : ""} ${c.confidential ? icon("lock", "sm") : ""}<div class="small muted">v${c.current_version}</div></td>
@@ -18,6 +18,87 @@ export async function render(view, ctx, params) {
         <td>${scoreBadge(c.score)}</td><td>${c.analysis_id ? `${c.issues}${c.critical ? ` <span class="pill high">${c.critical} serious</span>` : ""}` : "—"}</td><td class="muted small">${ago(c.updated_at)}</td></tr>`).join("")}
     </tbody></table>${list.length ? "" : `<div class="empty">${icon("inbox")}<div>No content yet.</div></div>`}</div>`;
   view.onclick = (e) => { const tr = e.target.closest("tr[data-href]"); if (tr) location.hash = tr.dataset.href; };
+  const bulk = $("#bulk");
+  if (bulk) bulk.onclick = () => bulkReview(view, ctx);
+}
+
+// ---------------------------------------------------------------- bulk review from CSV
+function parseCSV(text) {
+  const rows = [];
+  let row = [], cell = "", q = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (q) {
+      if (ch === '"' && text[i + 1] === '"') { cell += '"'; i++; }
+      else if (ch === '"') q = false;
+      else cell += ch;
+    } else if (ch === '"') q = true;
+    else if (ch === ",") { row.push(cell); cell = ""; }
+    else if (ch === "\n" || ch === "\r") {
+      if (ch === "\r" && text[i + 1] === "\n") i++;
+      row.push(cell); cell = "";
+      if (row.some((c) => c.trim())) rows.push(row);
+      row = [];
+    } else cell += ch;
+  }
+  row.push(cell);
+  if (row.some((c) => c.trim())) rows.push(row);
+  if (!rows.length) return [];
+  const head = rows[0].map((h) => h.trim().toLowerCase());
+  const col = (names) => head.findIndex((h) => names.includes(h));
+  const iBody = col(["body", "text", "copy", "caption", "content"]), iTitle = col(["title", "name"]), iCh = col(["channel"]), iAlt = col(["alt_text", "alt text", "alt"]);
+  if (iBody < 0) return null;
+  return rows.slice(1).map((r) => ({ title: r[iTitle] ?? "", channel: r[iCh] ?? "", body: r[iBody] ?? "", alt_text: iAlt >= 0 ? r[iAlt] ?? "" : "" })).filter((r) => r.body.trim());
+}
+
+async function bulkReview(view, ctx) {
+  const ai = ctx.status.ai_configured;
+  const go = await modal({
+    title: `${icon("table", "sm")} Bulk review from CSV`, wide: true,
+    body: `<p class="ink2" style="margin-top:0">Review up to 25 posts at once, for example a content calendar. Columns: <code>title</code>, <code>channel</code>, <code>body</code> (required), <code>alt_text</code>. Each row becomes a draft with its own report.</p>
+      <div class="row wrap" style="gap:8px;margin-bottom:10px"><label class="btn sm">${icon("upload", "sm")} Choose CSV file<input type="file" id="bk-file" accept=".csv,text/csv" hidden></label>
+        <button class="btn sm" id="bk-sample">${icon("flask-conical", "sm")} Load sample (6 posts)</button><a class="small" href="/demo/bulk_review_sample.csv" download>Download sample CSV</a></div>
+      <textarea class="textarea mono" id="bk-text" style="min-height:160px" placeholder="title,channel,body&#10;Weekend offer,Instagram,&quot;Your post text…&quot;"></textarea>
+      <div class="row" style="margin-top:8px"><span class="small muted" id="bk-count">0 rows</span>
+        ${ai ? `<label class="toggle small right"><input type="checkbox" id="bk-ai"><span class="sl"></span>Include AI review (5 rows max, slower)</label>` : `<span class="small muted right">${icon("cpu", "sm")} Rule engine</span>`}</div>`,
+    onMount: (ov) => {
+      const ta = $("#bk-text", ov);
+      const count = () => { const r = parseCSV(ta.value); $("#bk-count", ov).textContent = r === null ? "No 'body' column found" : `${r.length} row(s) with text`; };
+      ta.oninput = count;
+      $("#bk-file", ov).onchange = async (e) => { const f = e.target.files[0]; if (f) { ta.value = await f.text(); count(); } };
+      $("#bk-sample", ov).onclick = async () => { ta.value = await (await fetch("/demo/bulk_review_sample.csv")).text(); count(); };
+    },
+    actions: [{ label: "Cancel", value: null }, { label: "Review all", cls: "primary", onClick: (ov) => {
+      const rows = parseCSV($("#bk-text", ov).value);
+      if (!rows || !rows.length) { toast("Add a CSV with a 'body' column and at least one row", "err"); return false; }
+      if (rows.length > 25) { toast(`Up to 25 rows per batch (you have ${rows.length})`, "err"); return false; }
+      return { rows, use_ai: !!$("#bk-ai", ov)?.checked };
+    } }],
+  });
+  if (!go) return;
+  const wait = document.createElement("div");
+  wait.className = "overlay";
+  wait.innerHTML = `<div class="modal" style="width:min(420px,100%)"><div class="modal-b row"><span class="spin"></span> Reviewing ${go.rows.length} item(s)…</div></div>`;
+  document.body.appendChild(wait);
+  const r = await guard(() => api("/api/bulk-review", { method: "POST", body: go }));
+  wait.remove();
+  if (!r) return;
+  const s = r.summary;
+  await modal({
+    title: `${icon("list-checks", "sm")} Bulk review: ${s.count} item(s)`, wide: true,
+    body: `<div class="grid g4" style="gap:10px;margin-bottom:12px">
+        <div class="kpi"><div class="lbl">Average score</div><div class="val">${Math.round(s.avg_score)}</div></div>
+        <div class="kpi"><div class="lbl">Ready to publish</div><div class="val">${s.ready}</div></div>
+        <div class="kpi"><div class="lbl">High brand risk</div><div class="val">${s.high_risk}</div></div>
+        <div class="kpi"><div class="lbl">Engine</div><div class="val" style="font-size:16px">${r.ai_used ? "AI + rules" : "Rules"}</div></div></div>
+      <table class="t keep"><thead><tr><th>Score</th><th>Item</th><th>Serious</th><th>Top issues</th></tr></thead><tbody>
+      ${r.items.sort((x, y) => x.score - y.score).map((i) => `<tr><td>${scoreBadge(i.score)}</td><td><a href="#/reports/${i.id}"><b>${esc(i.title)}</b></a><div class="small muted">${esc(i.channel)}</div></td>
+        <td>${i.serious || "—"}</td><td class="small">${i.top.map(esc).join("; ") || "No issues"}</td></tr>`).join("")}</tbody></table>
+      <p class="small muted">Each item is a draft with its own report: open one to accept fixes and submit it for approval.</p>`,
+    onMount: (ov) => ov.addEventListener("click", (e) => { if (e.target.closest("a[href^='#/reports/']")) ov.remove(); }),
+    actions: [{ label: "Done", cls: "primary" }],
+  });
+  render(view, ctx, {});
 }
 
 // Content types the brief names: a post, an advertisement, an email or a document.

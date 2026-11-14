@@ -9,7 +9,7 @@ export async function render(view, ctx) {
   const s = ctx.status;
   const roles = ["admin", "creator", "manager", "approver"];
   const admin = s.permissions.brand.includes(ctx.me.role);
-  const [fb, health] = await Promise.all([admin ? api("/api/feedback").catch(() => null) : null, api("/api/health").catch(() => null)]);
+  const [fb, health, pol] = await Promise.all([admin ? api("/api/feedback").catch(() => null) : null, api("/api/health").catch(() => null), api("/api/policy").catch(() => null)]);
   view.innerHTML = `
     <div class="page-head"><div><h1>Settings</h1><div class="sub">AI configuration, privacy, roles and demo data.</div></div></div>
     <div class="grid g2" style="align-items:start">
@@ -36,6 +36,7 @@ export async function render(view, ctx) {
           </ul></div></div>
       </div>
       <div class="stack">
+        ${policyCard(pol, admin)}
         ${feedbackCard(fb, admin)}
         <div class="card"><div class="card-h"><h2>${icon("users", "sm")} Roles & permissions</h2></div><div class="card-b" style="overflow-x:auto">
           <table class="t keep"><thead><tr><th>Action</th>${roles.map((r) => `<th>${r}</th>`).join("")}</tr></thead><tbody>
@@ -50,6 +51,10 @@ export async function render(view, ctx) {
       </div>
     </div>`;
   view.querySelector("#fb-open")?.addEventListener("click", openFeedback);
+  view.querySelector("#pol-save")?.addEventListener("click", async () => {
+    const body = { min_score_to_submit: +view.querySelector("#pol-min").value, require_endorsement: view.querySelector("#pol-end").checked, block_critical: view.querySelector("#pol-crit").checked };
+    if (await guard(() => api("/api/policy", { method: "POST", body }), "Approval policy saved")) render(view, ctx);
+  });
   const b = view.querySelector("#reset");
   b.onclick = async () => {
     const ok = await modal({ title: "Reset all data?", body: `<p class="ink2">This deletes every content item, review, comment and Brand Brain change, then reloads the demo dataset. It cannot be undone.</p>`, actions: [{ label: "Cancel", value: false }, { label: "Reset", cls: "danger solid", value: true }] });
@@ -94,4 +99,18 @@ function healthCard(h) {
       <tr><td class="muted">AI review time</td><td>${r.median_ai_s == null ? "—" : `median ${r.median_ai_s} s · 90th percentile ${r.p90_ai_s} s`}</td></tr>
       ${r.last_error ? `<tr><td class="muted">Last AI error</td><td class="small">${esc(r.last_error)}</td></tr>` : ""}
     </tbody></table></div></div>`;
+}
+
+function policyCard(p, admin) {
+  if (!p) return "";
+  const dis = admin ? "" : "disabled";
+  return `<div class="card"><div class="card-h"><h2>${icon("scale", "sm")} Approval policy</h2>${admin ? "" : `<span class="pill right">${icon("eye", "sm")} Set by brand admins</span>`}</div><div class="card-b">
+    <p class="ink2" style="margin-top:0">Rules every submission must meet. They are enforced by the server, and every change is recorded in the audit log.</p>
+    <div class="field"><label class="f" for="pol-min">Minimum compliance score to submit for approval</label>
+      <div class="row" style="gap:10px"><input class="input" id="pol-min" type="number" min="0" max="100" value="${p.min_score_to_submit}" style="width:100px" ${dis}>
+      <span class="small muted">0 = off. Findings marked as false positives do not count.</span></div></div>
+    <label class="toggle" style="margin-bottom:10px"><input type="checkbox" id="pol-end" ${p.require_endorsement ? "checked" : ""} ${dis}><span class="sl"></span><span><b>Manager endorsement required</b> <span class="muted small">before an approver can approve</span></span></label>
+    <label class="toggle"><input type="checkbox" id="pol-crit" ${p.block_critical ? "checked" : ""} ${dis}><span class="sl"></span><span><b>Block approval with open critical issues</b> <span class="muted small">even with an override reason</span></span></label>
+    ${admin ? `<div class="row" style="margin-top:12px"><button class="btn primary right" id="pol-save">${icon("save", "sm")} Save policy</button></div>` : ""}
+  </div></div>`;
 }
