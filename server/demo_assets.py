@@ -142,6 +142,27 @@ DEALER_BROCHURE = [
      ],
 ]
 
+# A guideline update for the "Extract rules" demo: new product, service, words and colour not yet in the Brand Brain.
+GUIDELINE_UPDATE = [
+    ["# Voltaro Brand Guidelines - Update 2026.2 (fictional demo organisation)",
+     "",
+     "# New service: Voltaro Care+",
+     "Always write the service name as 'Voltaro Care+' with the plus sign attached.",
+     "Voltaro Care+ costs Rs 2,499 per year and includes doorstep servicing.",
+     "Voltaro Care+ covers roadside assistance within 25 km of any Voltaro Experience Centre.",
+     "",
+     "# Words we no longer use",
+     "Never use 'insane' or 'mind-blowing' to describe performance; say 'responsive' instead.",
+     "Do not use 'lifetime free service'; no service plan is free for life.",
+     "",
+     "# Approved claim",
+     "We may say 'Rated 4.6 out of 5 by Voltaro riders' (evidence: rider survey, September 2026).",
+     "",
+     "# New accent colour",
+     "Ocean Teal #0FA3B1 is approved for charging and sustainability visuals only.",
+     ],
+]
+
 DIWALI_CAPTION = ("Meet the all-new VoltaroGlide S1 — India's fastest electric scooter!! Get 150 km on a single charge, "
                   "GUARANTEED. Zero maintenance and an unbeatable price make it a total no-brainer. "
                   "Offer valid till 31 Dec 2025. Click here to book your ride! #voltaroglidediwali")
@@ -154,7 +175,7 @@ def generate(brand_dir: Path, demo_dir: Path) -> dict:
     logo = brand_dir / "voltaro_logo_primary.png"
     official_logo(logo)
     needed = ["logo_used_in_poster.png", "diwali_poster.png", "Voltaro_Brand_Book_2026.pdf", "diwali_caption.txt", "voltaro_logo_primary.png",
-              "Voltaro_Dealer_Brochure_draft.pdf"]
+              "Voltaro_Dealer_Brochure_draft.pdf", "Voltaro_Guidelines_Update_2026.pdf"]
     if all((demo_dir / n).exists() for n in needed):
         return {"logo": logo}
     try:
@@ -164,6 +185,7 @@ def generate(brand_dir: Path, demo_dir: Path) -> dict:
         poster(demo_dir / "diwali_poster.png", bad)
         brand_book_pdf(demo_dir / "Voltaro_Brand_Book_2026.pdf", BRAND_BOOK)
         brand_book_pdf(demo_dir / "Voltaro_Dealer_Brochure_draft.pdf", DEALER_BROCHURE)
+        brand_book_pdf(demo_dir / "Voltaro_Guidelines_Update_2026.pdf", GUIDELINE_UPDATE)
         (demo_dir / "diwali_caption.txt").write_text(DIWALI_CAPTION, encoding="utf-8")
         import shutil
         shutil.copy(logo, demo_dir / "voltaro_logo_primary.png")

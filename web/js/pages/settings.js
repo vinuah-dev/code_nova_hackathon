@@ -9,7 +9,7 @@ export async function render(view, ctx) {
   const s = ctx.status;
   const roles = ["admin", "creator", "manager", "approver"];
   const admin = s.permissions.brand.includes(ctx.me.role);
-  const fb = admin ? await api("/api/feedback").catch(() => null) : null;
+  const [fb, health] = await Promise.all([admin ? api("/api/feedback").catch(() => null) : null, api("/api/health").catch(() => null)]);
   view.innerHTML = `
     <div class="page-head"><div><h1>Settings</h1><div class="sub">AI configuration, privacy, roles and demo data.</div></div></div>
     <div class="grid g2" style="align-items:start">
@@ -23,6 +23,7 @@ export async function render(view, ctx) {
             <tr><td class="muted">Fallback</td><td>If the AI is unavailable, the deterministic rule-engine report is shown and labelled</td></tr></tbody></table>
           ${s.ai_configured ? "" : `<div class="banner info" style="margin-top:12px">${icon("key-round", "sm")}<div>To enable AI review for free: get a key at <b>aistudio.google.com</b> (Google AI Studio), put <code>INKLOOM_AI_PROVIDER=gemini</code> and <code>GEMINI_API_KEY=...</code> in <code>.env</code> (or Vercel → Environment Variables) and restart. Claude works too with <code>ANTHROPIC_API_KEY</code>. Keys stay on the server and never reach the browser.</div></div>`}
         </div></div>
+        ${healthCard(health)}
         <div class="card"><div class="card-h"><h2>${icon("lock", "sm")} Privacy & responsible AI</h2></div><div class="card-b ink2">
           <ul style="margin:0;padding-left:18px" class="kbd-list">
             <li><b>Disclosure:</b> with AI on, content text, images and retrieved guideline excerpts are sent to the configured AI provider (${esc(s.provider_label)}) for review. Free tiers (e.g. Gemini free) may let the provider use submitted data to improve its products, so use Confidential mode for sensitive material. Nothing is sent in rule-engine mode.</li>
@@ -78,4 +79,19 @@ function feedbackCard(fb, admin) {
       <span class="muted small">· ${esc(r.task)} · ${r.rating}/5 · ${esc(r.completed || "n/a")} · ${esc(r.device || "")} · ${ago(r.created_at)}</span>
       <div class="ink2" style="margin-top:3px">${esc(r.comment)}</div></div>`).join("") || `<div class="muted small">No comments yet.</div>`}</div>
   </div></div>`;
+}
+
+function healthCard(h) {
+  if (!h) return "";
+  const r = h.reviews;
+  const okShare = r.ai_attempted ? Math.round((r.ai_ok / r.ai_attempted) * 100) : null;
+  return `<div class="card"><div class="card-h"><h2>${icon("activity", "sm")} System health</h2><span class="pill ${okShare == null || okShare >= 80 ? "good" : "medium"} right">${okShare == null ? "No AI reviews yet" : `${okShare}% AI reviews succeeded`}</span></div><div class="card-b">
+    <table class="t keep"><tbody>
+      <tr><td class="muted">Database</td><td>${h.database.backend === "postgres" ? "PostgreSQL (Supabase)" : "SQLite (local)"} · ${h.database.round_trip_ms} ms round trip</td></tr>
+      <tr><td class="muted">AI model</td><td>${esc(h.ai.provider)} <code>${esc(h.ai.model)}</code>${h.ai.fallback_model ? `, fallback <code>${esc(h.ai.fallback_model)}</code>` : ""}</td></tr>
+      <tr><td class="muted">Time limit</td><td>${h.ai.budget_s} s per review, then the rule report is used</td></tr>
+      <tr><td class="muted">Last ${r.recent} reviews</td><td>${r.ai_ok} with AI, ${r.fell_back_to_rules} fell back to rules${r.recent - r.ai_attempted ? `, ${r.recent - r.ai_attempted} rules only (confidential or no AI)` : ""}</td></tr>
+      <tr><td class="muted">AI review time</td><td>${r.median_ai_s == null ? "—" : `median ${r.median_ai_s} s · 90th percentile ${r.p90_ai_s} s`}</td></tr>
+      ${r.last_error ? `<tr><td class="muted">Last AI error</td><td class="small">${esc(r.last_error)}</td></tr>` : ""}
+    </tbody></table></div></div>`;
 }

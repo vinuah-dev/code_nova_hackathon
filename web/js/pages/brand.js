@@ -18,7 +18,7 @@ export async function render(view, ctx) {
     <div class="tabs">${TABS.map(([k, l, ic]) => `<button class="${tab === k ? "active" : ""}" data-tab="${k}">${icon(ic, "sm")} ${l}${counts[k] != null ? ` <span class="n">${counts[k]}</span>` : ""}</button>`).join("")}</div>
     <div id="pane">${pane(b, admin)}</div>`;
   view.onclick = async (e) => {
-    const t = e.target.closest("[data-tab],[data-add],[data-del],[data-edit-g],[data-upload],[data-search]");
+    const t = e.target.closest("[data-tab],[data-add],[data-del],[data-edit-g],[data-upload],[data-search],[data-extract]");
     if (!t) return;
     if (t.dataset.tab) { tab = t.dataset.tab; return render(view, ctx); }
     if (t.dataset.del) {
@@ -30,6 +30,7 @@ export async function render(view, ctx) {
     if (t.dataset.editG !== undefined) return editGuideline(view, ctx, b.guidelines.find((g) => g.id === t.dataset.editG));
     if (t.dataset.add) return addItem(view, ctx, t.dataset.add);
     if (t.dataset.upload) return upload(view, ctx, t.dataset.upload);
+    if (t.dataset.extract) return extractRules(view, ctx, +t.dataset.extract);
     if (t.hasAttribute("data-search")) return search();
   };
   const q = $("#q");
@@ -69,7 +70,8 @@ function pane(b, admin) {
       <p class="small muted">Logos used in content are compared against these: aspect ratio (distortion), main colour (ΔE) and shape hash.</p></div></div></div>`;
   if (tab === "documents") return `<div class="card"><div class="card-h"><h2>Brand documents</h2>${admin ? `<button class="btn primary sm right" data-upload="documents">${icon("upload", "sm")} Upload guidelines (PDF / TXT / MD)</button>` : ""}</div><div class="card-b">
     <p class="ink2">Uploaded documents are split into paragraphs and indexed. Reviews retrieve the most relevant paragraphs and the AI must cite them by id (e.g. <code>DOC-1#3</code>).</p>
-    ${b.documents.length ? `<table class="t"><thead><tr><th>Document</th><th>Characters indexed</th><th>Uploaded</th><th></th></tr></thead><tbody>${b.documents.map((d) => `<tr><td>${icon("file-text", "sm")} <b>${esc(d.name)}</b> <span class="src id">DOC-${d.id}</span></td><td>${d.chars}</td><td class="muted small">${ago(d.uploaded_at)}</td><td>${del(admin, "documents", d.id)}</td></tr>`).join("")}</tbody></table>`
+    ${b.documents.length ? `<table class="t"><thead><tr><th>Document</th><th>Characters indexed</th><th>Uploaded</th><th></th></tr></thead><tbody>${b.documents.map((d) => `<tr><td>${icon("file-text", "sm")} <b>${esc(d.name)}</b> <span class="src id">DOC-${d.id}</span></td><td>${d.chars}</td><td class="muted small">${ago(d.uploaded_at)}</td><td class="row" style="gap:6px;justify-content:flex-end">${admin ? `<button class="btn sm primary" data-extract="${d.id}">${icon("wand-2", "sm")} Extract rules</button>` : ""}${del(admin, "documents", d.id)}</td></tr>`).join("")}</tbody></table>
+      <p class="small muted" style="margin-bottom:0">${icon("info", "sm")} <b>Extract rules</b> reads a document and proposes facts, terms, banned phrases, approved claims and colours. Each proposal quotes the sentence it came from; you choose what to add. Try it with <a href="/demo/Voltaro_Guidelines_Update_2026.pdf" target="_blank">Voltaro_Guidelines_Update_2026.pdf</a> (demo file: upload it, then Extract rules).</p>`
       : `<div class="empty">${icon("file-up")}<div>No documents yet. Try <a href="/demo/Voltaro_Brand_Book_2026.pdf" target="_blank">Voltaro_Brand_Book_2026.pdf</a> (demo file).</div></div>`}</div></div>`;
   return `<div class="card"><div class="card-b"><p class="ink2">See exactly what the reviewer would retrieve from the Brand Brain for any text. This is the retrieval step (BM25) that grounds AI findings.</p>
     <div class="row"><input class="input" id="q" placeholder="e.g. Diwali offer with 150 km range and a red background"><button class="btn primary" data-search>${icon("search", "sm")} Retrieve</button></div>
@@ -132,4 +134,58 @@ async function search() {
   const hits = await guard(() => api(`/api/brand/search?q=${encodeURIComponent(q)}`));
   if (!hits) return;
   $("#res").innerHTML = hits.map((h) => `<div class="src"><div class="row"><span class="id">${esc(h.id)}</span><b>${esc(h.title)}</b><span class="pill">${esc(h.type)}</span><span class="muted small right">${h.always ? "always applied" : `BM25 ${h.score}`}</span></div><div class="ink2" style="margin-top:4px">${esc(h.text)}</div></div>`).join("");
+}
+
+// ---------------------------------------------------------------- import rules from a document
+const KIND_LABEL = { facts: "Approved facts", terms: "Terminology", prohibited: "Prohibited phrases", claims: "Approved claims", colors: "Colours" };
+const describe = {
+  facts: (i) => `<b>${esc(i.label)}</b>: ${esc(i.value ?? "")} ${esc(i.unit || "")}<div class="small ink2">${esc(i.statement)}</div>`,
+  terms: (i) => `Write <b>${esc(i.preferred)}</b>, not ${(i.disallowed || []).map((d) => `<span class="quote">${esc(d)}</span>`).join(" ") || "—"}`,
+  prohibited: (i) => `Avoid <span class="quote">${esc(i.phrase)}</span>${i.replacement ? ` → <b>${esc(i.replacement)}</b>` : ""}<div class="small ink2">${esc(i.reason || "")}</div>`,
+  claims: (i) => `<b>${esc(i.text)}</b><div class="small ink2">Evidence: ${esc(i.evidence || "")}</div>`,
+  colors: (i) => `<span class="swatch" style="display:inline-block;width:14px;height:14px;border-radius:4px;vertical-align:-2px;background:${esc(i.hex)}"></span> <b>${esc(i.name)}</b> <code>${esc(i.hex)}</code> ${esc(i.usage || "")}`,
+};
+const payload = {
+  facts: (i) => ({ label: i.label, value: i.value, unit: i.unit, statement: i.statement, keywords: i.keywords || [], source: `${i.source} (extracted)` }),
+  terms: (i) => ({ preferred: i.preferred, disallowed: i.disallowed || [], note: i.quote }),
+  prohibited: (i) => ({ phrase: i.phrase, reason: i.reason, replacement: i.replacement || "", severity: i.severity || "medium", category: "tone" }),
+  claims: (i) => ({ text: i.text, evidence: `${i.evidence} (${i.source})` }),
+  colors: (i) => ({ name: i.name, hex: i.hex, usage: i.usage || "" }),
+};
+
+async function extractRules(view, ctx, did) {
+  const wait = document.createElement("div");
+  wait.className = "overlay";
+  wait.innerHTML = `<div class="modal" style="width:min(420px,100%)"><div class="modal-b row"><span class="spin"></span> Reading the document and extracting rules…</div></div>`;
+  document.body.appendChild(wait);
+  const r = await guard(() => api(`/api/brand/documents/${did}/extract`, { method: "POST" }));
+  wait.remove();
+  if (!r) return;
+  const flat = Object.entries(r.proposals).flatMap(([kind, items]) => items.map((i) => ({ kind, i })));
+  const fresh = flat.filter((x) => !x.i.already).length;
+  const added = await modal({
+    title: `${icon("wand-2", "sm")} Rules found in ${esc(r.document.name)}`, wide: true,
+    body: `<div class="banner ${r.engine === "ai" ? "info" : "warn"}" style="margin-bottom:12px">${icon(r.engine === "ai" ? "sparkles" : "cpu", "sm")}<div>${esc(r.note)}${r.dropped_ungrounded ? ` ${r.dropped_ungrounded} proposal(s) were dropped because their quote was not in the document.` : ""}</div></div>
+      ${flat.length ? Object.entries(r.proposals).filter(([, v]) => v.length).map(([kind, items]) => `<div class="section-lbl" style="margin-top:10px">${KIND_LABEL[kind]}</div>
+        ${items.map((i, n) => `<label class="src row" style="gap:10px;align-items:flex-start;cursor:pointer;margin-bottom:6px">
+          <input type="checkbox" data-pick="${kind}:${n}" ${i.already ? "" : "checked"} style="margin-top:4px">
+          <div style="min-width:0">${describe[kind](i)}${i.already ? ` <span class="pill">already in Brand Brain</span>` : ""}
+            <div class="small muted" style="margin-top:3px">${icon("quote", "sm")} “${esc(i.quote)}” · ${esc(i.source)}</div></div></label>`).join("")}`).join("")
+        : `<div class="empty small">No rules could be extracted from this document.</div>`}`,
+    actions: [{ label: "Cancel", value: null }, ...(flat.length ? [{
+      label: `Add selected to Brand Brain`, cls: "primary",
+      onClick: async (ov) => {
+        const picks = [...ov.querySelectorAll("[data-pick]:checked")].map((c) => c.dataset.pick.split(":"));
+        if (!picks.length) { toast("Nothing selected", "err"); return false; }
+        let ok = 0;
+        for (const [kind, n] of picks) {
+          try { await api(`/api/brand/${kind}`, { method: "POST", body: payload[kind](r.proposals[kind][+n]) }); ok++; }
+          catch (e) { toast(`${KIND_LABEL[kind]}: ${e.message}`, "err"); }
+        }
+        return ok;
+      },
+    }] : [])],
+  });
+  if (added) { toast(`${added} rule(s) added to the Brand Brain. New reviews use them right away.`, "ok"); render(view, ctx); }
+  else if (fresh === 0 && flat.length) toast("Everything in this document is already in the Brand Brain");
 }

@@ -40,7 +40,7 @@ On Vercel, add the same variables under Project → Settings → Environment Var
 python scripts/smoke_test.py
 ```
 
-It runs 34 checks covering upload → review → fixes → approval → integrity → gap intelligence → analytics. `python scripts/mock_ai_test.py` runs 11 more against a local mock of an OpenAI-compatible AI server (request format, image input, grounding validation, fallback on 429). `python scripts/auth_test.py` runs 22 sign-in/sign-out checks with real cookies. `python scripts/feedback_test.py` runs 12 checks on in-app user-testing feedback and the audit-log export. `python scripts/learning_test.py` runs 14 checks on the feedback-learning model (shadow mode, quality gate, activation, admin pin).
+It runs 34 checks covering upload → review → fixes → approval → integrity → gap intelligence → analytics. `python scripts/mock_ai_test.py` runs 11 more against a local mock of an OpenAI-compatible AI server (request format, image input, grounding validation, fallback on 429). `python scripts/auth_test.py` runs 22 sign-in/sign-out checks with real cookies. `python scripts/feedback_test.py` runs 12 checks on in-app user-testing feedback and the audit-log export. `python scripts/extract_test.py` runs 13 checks on extracting rules from brand documents and the health endpoint. `python scripts/learning_test.py` runs 14 checks on the feedback-learning model (shadow mode, quality gate, activation, admin pin).
 
 ---
 

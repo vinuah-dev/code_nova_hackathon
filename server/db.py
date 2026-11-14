@@ -75,7 +75,7 @@ CREATE TABLE IF NOT EXISTS uploads (
 CREATE TABLE IF NOT EXISTS analyses (
   id INTEGER PRIMARY KEY AUTOINCREMENT, content_id INTEGER, version_number INTEGER,
   mode TEXT, engine_note TEXT, score REAL, dimensions TEXT, findings TEXT, retrieved TEXT,
-  ai_error TEXT, created_at TEXT
+  ai_error TEXT, created_at TEXT, ai_ms INTEGER
 );
 CREATE TABLE IF NOT EXISTS decisions (
   id INTEGER PRIMARY KEY AUTOINCREMENT, analysis_id INTEGER, finding_id TEXT, decision TEXT,
@@ -111,7 +111,8 @@ CREATE TABLE IF NOT EXISTS blobs (name TEXT PRIMARY KEY, data BLOB, mime TEXT, c
 """
 
 TABLES = re.findall(r"CREATE TABLE IF NOT EXISTS (\w+)", SCHEMA)
-KEEP_ON_RESET = {"feedback"}  # user-testing evidence survives "Reset demo data"
+KEEP_ON_RESET = {"feedback"}
+MIGRATIONS = [("users", "email", "TEXT"), ("users", "password_hash", "TEXT"), ("analyses", "ai_ms", "INTEGER")]  # user-testing evidence survives "Reset demo data"
 SERIAL_TABLES = {t for t, body in re.findall(r"CREATE TABLE IF NOT EXISTS (\w+) \((.*?)\);", SCHEMA, flags=re.S) if "AUTOINCREMENT" in body}
 
 
@@ -165,18 +166,17 @@ def conn():
             _conn = _connect_pg(url)
             with global_lock_raw(_conn):
                 _conn.execute(_pg_schema())
-                for col in ("email", "password_hash"):
-                    _conn.execute(f"ALTER TABLE users ADD COLUMN IF NOT EXISTS {col} TEXT")
+                for table, col, typ in MIGRATIONS:
+                    _conn.execute(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {col} {typ}")
         else:
             IS_PG = False
             _conn = sqlite3.connect(DB_PATH, check_same_thread=False)
             _conn.row_factory = sqlite3.Row
             _conn.execute("PRAGMA foreign_keys = ON")
             _conn.executescript(SCHEMA)
-            cols = {r[1] for r in _conn.execute("PRAGMA table_info(users)")}
-            for col in ("email", "password_hash"):  # databases created before login existed
-                if col not in cols:
-                    _conn.execute(f"ALTER TABLE users ADD COLUMN {col} TEXT")
+            for table, col, typ in MIGRATIONS:  # databases created before these columns existed
+                if col not in {r[1] for r in _conn.execute(f"PRAGMA table_info({table})")}:
+                    _conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {typ}")
             _conn.commit()
     return _conn
 

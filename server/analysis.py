@@ -1,4 +1,6 @@
-"""Runs a full review: rules + retrieval + (optionally) Claude, then scores."""
+"""Runs a full review: rules + retrieval + (optionally) the AI model, then scores."""
+import time
+
 from . import ai, config, db, learning, rag, rules, scoring
 
 CATS = {"tone", "terminology", "claims", "facts", "visual", "accessibility"}
@@ -71,14 +73,18 @@ def evaluate(body: str, alt_text: str, uploads: list[dict], allow_ai: bool = Tru
     sources = rag.retrieve(query, k=10)
     lookup = rag.source_lookup()
     findings = list(rule_findings)
-    mode, note, err = "rules", "Rule engine only: AI review is not configured.", None
+    mode, note, err, ai_ms = "rules", "Rule engine only: AI review is not configured.", None, None
     if not allow_ai:
         note = "Rule engine only: content is marked confidential, so it was not sent to the AI service."
     elif config.ai_configured():
         images = [u for u in uploads if (u.get("mime") or "").startswith("image/")]
         logos = db.q("SELECT * FROM assets WHERE kind='logo'")
         try:
-            res = ai.review(body, alt_text, pdf_text, images, logos, sources, rule_findings)
+            t_ai = time.monotonic()
+            try:
+                res = ai.review(body, alt_text, pdf_text, images, logos, sources, rule_findings)
+            finally:
+                ai_ms = int((time.monotonic() - t_ai) * 1000)
             texts = {"body": body or "", "alt_text": alt_text or "", "pdf": pdf_text}
             findings += _merge_ai(res, texts, rule_findings, lookup, images)
             mode, note = "ai+rules", f"{config.provider_label()} · {config.model()}: " + str(res.get("summary", ""))
@@ -90,7 +96,7 @@ def evaluate(body: str, alt_text: str, uploads: list[dict], allow_ai: bool = Tru
         f["sources"] = [{"id": s, "title": lookup[s]["title"], "text": lookup[s]["text"], "type": lookup[s]["type"]}
                         for s in f.get("source_ids", []) if s in lookup]
     sc = scoring.score(findings)
-    return {"mode": mode, "note": note, "ai_error": err, "findings": findings, "score": sc["overall"],
+    return {"mode": mode, "note": note, "ai_error": err, "ai_ms": ai_ms, "findings": findings, "score": sc["overall"],
             "dimensions": sc["dimensions"], "retrieved": [{k: s[k] for k in ("id", "title", "type", "score")} for s in sources],
             "pdf_text": pdf_text}
 
@@ -100,10 +106,10 @@ def run_for_content(content_id: int, user_id: str | None = None) -> dict:
     v = db.one("SELECT * FROM versions WHERE content_id=? AND number=?", (content_id, c["current_version"]))
     att = [a["id"] for a in db.pj(v["attachments"], [])]
     result = evaluate(v["body"] or "", v["alt_text"] or "", _uploads(att), allow_ai=not c["confidential"])
-    aid = db.ex("INSERT INTO analyses(content_id, version_number, mode, engine_note, score, dimensions, findings, retrieved, ai_error, created_at)"
-                " VALUES (?,?,?,?,?,?,?,?,?,?)",
+    aid = db.ex("INSERT INTO analyses(content_id, version_number, mode, engine_note, score, dimensions, findings, retrieved, ai_error, created_at, ai_ms)"
+                " VALUES (?,?,?,?,?,?,?,?,?,?,?)",
                 (content_id, v["number"], result["mode"], result["note"], result["score"], db.j(result["dimensions"]),
-                 db.j(result["findings"]), db.j(result["retrieved"]), result["ai_error"], db.now()))
+                 db.j(result["findings"]), db.j(result["retrieved"]), result["ai_error"], db.now(), result["ai_ms"]))
     return {"analysis_id": aid, **result}
 
 

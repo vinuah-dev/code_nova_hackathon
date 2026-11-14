@@ -14,7 +14,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
 
-from . import analysis, auth, config, db, gaps, integrity, learning, rag, scoring, storage, visual
+from . import analysis, auth, config, db, extract, gaps, integrity, learning, rag, scoring, storage, visual
 from .config import UPLOAD_DIR, WEB_DIR
 
 config.load_env()
@@ -288,6 +288,16 @@ def save_guideline(data: dict = Body(...), x_user_id: str | None = Header(None))
         db.ex("UPDATE guidelines SET title=?, body=?, category=?, version=version+?, updated_at=? WHERE id=?",
               (data["title"], data["body"], data.get("category") or old["category"], 1 if old["body"] != data["body"] else 0, db.now(), old["id"]))
     return {"id": data["id"]}
+
+
+@app.post("/api/brand/documents/{did}/extract")
+def extract_rules(did: int, x_user_id: str | None = Header(None)):
+    """Propose Brand Brain entries from an uploaded guideline document; the admin reviews and adds them."""
+    need(user(x_user_id), "brand")
+    try:
+        return extract.extract(did)
+    except LookupError:
+        raise HTTPException(404, "Document not found")
 
 
 @app.post("/api/brand/{kind}")
@@ -841,6 +851,27 @@ def audit_csv(x_user_id: str | None = Header(None)):
         w.writerow([e["at"], e["content_id"], titles.get(e["content_id"], ""), who["name"], who["role"], e["action"],
                     e["from_status"] or "", e["to_status"] or "", version, sha, override, note])
     return Response(buf.getvalue(), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=inkloom-audit-log.csv"})
+
+
+@app.get("/api/health")
+def health(x_user_id: str | None = Header(None)):
+    """Reliability at a glance: database round trip and how the last 50 reviews went."""
+    user(x_user_id)
+    import time as _t
+    t0 = _t.monotonic()
+    db.one("SELECT 1 AS ok")
+    db_ms = round((_t.monotonic() - t0) * 1000, 1)
+    rows = db.q("SELECT mode, ai_error, ai_ms, created_at FROM analyses WHERE created_at >= '2026-11-01' ORDER BY id DESC LIMIT 50")
+    tried = [r for r in rows if r["ai_ms"] is not None]
+    times = sorted(r["ai_ms"] for r in tried if r["mode"] == "ai+rules")
+    pct = lambda p: times[min(len(times) - 1, int(round(p * (len(times) - 1))))] if times else None  # noqa: E731
+    return {"database": {"backend": db.backend(), "round_trip_ms": db_ms},
+            "ai": {"configured": config.ai_configured(), "provider": config.provider_label(), "model": config.model(),
+                   "fallback_model": config.fallback_model(), "budget_s": config.ai_budget_seconds()},
+            "reviews": {"recent": len(rows), "ai_attempted": len(tried), "ai_ok": len(times),
+                        "fell_back_to_rules": sum(1 for r in tried if r["mode"] != "ai+rules"),
+                        "median_ai_s": round(pct(0.5) / 1000, 1) if times else None, "p90_ai_s": round(pct(0.9) / 1000, 1) if times else None,
+                        "last_error": next((r["ai_error"] for r in rows if r["ai_error"]), None)}}
 
 
 @app.get("/api/feedback/tasks")
