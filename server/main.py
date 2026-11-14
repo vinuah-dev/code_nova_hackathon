@@ -820,6 +820,29 @@ def feedback_csv(x_user_id: str | None = Header(None)):
     return Response(buf.getvalue(), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=inkloom-user-feedback.csv"})
 
 
+@app.get("/api/audit.csv")
+def audit_csv(x_user_id: str | None = Header(None)):
+    """Full audit trail: who did what to which content, including approvals, overrides and integrity alerts."""
+    u = user(x_user_id)
+    if u["role"] not in ("admin", "approver", "manager"):
+        raise HTTPException(403, "Only admins, managers and approvers can export the audit log")
+    import csv
+    users = {r["id"]: r for r in db.q("SELECT id, name, role FROM users")}
+    titles = {r["id"]: r["title"] for r in db.q("SELECT id, title FROM content")}
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(["at", "content_id", "content", "user", "role", "action", "from_status", "to_status", "version", "sha256", "override_reason", "note"])
+    for e in db.q("SELECT * FROM events ORDER BY at, id"):
+        who = users.get(e["user_id"]) or {"name": e["user_id"], "role": ""}
+        note, version, sha, override = e["note"] or "", "", "", ""
+        snap = db.pj(note) if e["action"] == "approved" else None
+        if isinstance(snap, dict):
+            version, sha, override, note = snap.get("version", ""), snap.get("hash", ""), snap.get("override_reason") or "", snap.get("note") or ""
+        w.writerow([e["at"], e["content_id"], titles.get(e["content_id"], ""), who["name"], who["role"], e["action"],
+                    e["from_status"] or "", e["to_status"] or "", version, sha, override, note])
+    return Response(buf.getvalue(), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=inkloom-audit-log.csv"})
+
+
 @app.get("/api/feedback/tasks")
 def feedback_tasks():
     return FEEDBACK_TASKS

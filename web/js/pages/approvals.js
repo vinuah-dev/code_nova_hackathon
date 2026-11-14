@@ -13,7 +13,8 @@ export async function render(view, ctx) {
 
   view.innerHTML = `
     <div class="page-head"><div><h1>Approval Center</h1><div class="sub">AI recommends. Humans decide. Every decision is recorded, and approved content is sealed with SHA-256.</div></div>
-      <div class="actions"><span class="pill indigo">${icon("user", "sm")} You: ${esc(ctx.me.title)}</span></div></div>
+      <div class="actions"><span class="pill indigo">${icon("user", "sm")} You: ${esc(ctx.me.title)}</span>
+        ${["admin", "approver", "manager"].includes(role) ? `<a class="btn" href="/api/audit.csv" download title="Every action, approval, override and integrity alert as CSV">${icon("download", "sm")} Audit log (CSV)</a>` : ""}</div></div>
     <div class="tabs">${T("queue", "Approval queue", "inbox", pending.length)}${T("revise", "Needs revision", "undo-2", revise.length)}${T("done", "Decided", "check-check", done.length)}${T("integrity", "Integrity Shield", "shield-check", openAlerts.length || null)}</div>
     <div id="pane"></div>`;
   const pane = view.querySelector("#pane");

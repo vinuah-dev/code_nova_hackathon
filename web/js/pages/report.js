@@ -220,7 +220,7 @@ function findingsCard(a, ctx) {
   const list = a.findings.filter((f) => state.filter === "all" || f.category === state.filter || (state.filter === "open" && !f.decision));
   const open = a.findings.filter((f) => !f.decision).length;
   return `<div class="card"><div class="card-h"><h2>${icon("list-checks", "sm")} Findings</h2><span class="muted small">${open} awaiting decision</span>
-      ${can(ctx, "decide_fix") && a.findings.some((f) => !f.decision && f.suggestion?.replacement != null && f.start != null) ? `<button class="btn sm right" data-accept-all>${icon("check-check", "sm")} Accept all text fixes</button>` : ""}</div>
+      ${can(ctx, "decide_fix") && a.findings.some((f) => !f.decision && f.suggestion?.replacement != null && f.start != null) ? `<span class="right row" style="gap:6px"><button class="btn sm" data-accept-all>${icon("check-check", "sm")} Accept all text fixes</button>${can(ctx, "edit") ? `<button class="btn sm primary" data-accept-apply>${icon("wand-2", "sm")} Accept all & apply</button>` : ""}</span>` : ""}</div>
     <div class="card-b">
       <div class="chips" style="margin-bottom:12px">
         <button class="chip ${state.filter === "all" ? "active" : ""}" data-filter="all">All ${a.findings.length}</button>
@@ -260,6 +260,7 @@ function finding(f, ctx) {
       ${canDecide ? `<button class="btn sm ${f.decision === "accepted" ? "on-accept" : ""}" data-dec="accepted" data-id="${f.id}">${icon("check", "sm")} ${f.decision === "accepted" ? "Accepted" : hasRep ? "Accept fix" : "Acknowledge"}</button>
       <button class="btn sm ${f.decision === "rejected" ? "on-reject" : ""}" data-dec="rejected" data-id="${f.id}" title="Mark as false positive / keep original">${icon("x", "sm")} ${f.decision === "rejected" ? "Rejected" : "Reject"}</button>` : ""}
       ${f.decision && canDecide ? `<button class="btn sm ghost" data-dec="" data-id="${f.id}">Undo</button>` : ""}
+      ${can(ctx, "edit") && !hasRep && ["body", "alt_text"].includes(f.target) ? `<button class="btn sm" data-fixman="${f.id}" title="Open the editor with this text selected">${icon("pencil", "sm")} Fix manually</button>` : ""}
       ${can(ctx, "comment") ? `<button class="btn sm ghost right" data-comment="${f.id}">${icon("message-circle", "sm")} Comment</button>` : ""}
     </div>
     ${f.decision_note ? `<div class="small muted" style="margin-top:6px">Note: ${esc(f.decision_note)}</div>` : ""}
@@ -375,6 +376,12 @@ function wire(view, ctx, rep, detail) {
       await guard(() => api(`/api/analyses/${a.id}/decisions`, { method: "POST", body: { finding_id: t.dataset.id, decision: t.dataset.dec || null, note } }));
       return reload();
     }
+    if (t.dataset.fixman) return editContent(rep, a.findings.find((f) => f.id === t.dataset.fixman));
+    if (t.hasAttribute("data-accept-apply")) {
+      const todo = a.findings.filter((f) => !f.decision && f.suggestion?.replacement != null && f.start != null);
+      for (const f of todo) await api(`/api/analyses/${a.id}/decisions`, { method: "POST", body: { finding_id: f.id, decision: "accepted" } });
+      return applyFixes(id, a);
+    }
     if (t.hasAttribute("data-accept-all")) {
       const todo = a.findings.filter((f) => !f.decision && f.suggestion?.replacement != null && f.start != null);
       for (const f of todo) await api(`/api/analyses/${a.id}/decisions`, { method: "POST", body: { finding_id: f.id, decision: "accepted" } });
@@ -468,19 +475,25 @@ async function approve(id, a) {
   window.dispatchEvent(new HashChangeEvent("hashchange"));
 }
 
-async function editContent(rep) {
+async function editContent(rep, focus = null) {
   const v = rep.version, c = rep.content;
   const r = await modal({
-    title: "Edit content (creates a new version)",
+    title: focus ? `Fix manually: ${esc(focus.title)}` : "Edit content (creates a new version)",
     body: `${c.status === "approved" ? `<div class="banner warn" style="margin-bottom:12px">${icon("shield-alert", "sm")}<div>This content is approved. Editing it will break the approval seal and send it back for review.</div></div>` : ""}
+      ${focus ? `<div class="banner info" style="margin-bottom:12px">${icon("info", "sm")}<div><b>${esc(focus.quote || "")}</b>: ${esc(focus.explanation || "")}${focus.suggestion?.rationale ? ` <span class="muted">${esc(focus.suggestion.rationale)}</span>` : ""}<div class="small muted" style="margin-top:4px">The text is selected below. Change it, save, and the new version is reviewed again.</div></div></div>` : ""}
       <div class="field"><label class="f">Title</label><input class="input" id="et" value="${esc(c.title)}"></div>
       <div class="field"><label class="f">Caption / body</label><textarea class="textarea" id="eb" style="min-height:160px">${esc(v.body || "")}</textarea></div>
       <div class="field"><label class="f">Alt text</label><textarea class="textarea" id="ea" style="min-height:70px">${esc(v.alt_text || "")}</textarea></div>`,
-    actions: [{ label: "Cancel", value: null }, { label: "Save new version", cls: "primary", onClick: (ov) => ({ title: $("#et", ov).value, body: $("#eb", ov).value, alt_text: $("#ea", ov).value, note: "Edited manually" }) }],
+    onMount: (ov) => {
+      if (!focus || focus.start == null) return;
+      const ta = $(focus.target === "alt_text" ? "#ea" : "#eb", ov);
+      setTimeout(() => { ta.focus(); ta.setSelectionRange(focus.start, focus.end); }, 60);
+    },
+    actions: [{ label: "Cancel", value: null }, { label: "Save and re-review", cls: "primary", onClick: (ov) => ({ title: $("#et", ov).value, body: $("#eb", ov).value, alt_text: $("#ea", ov).value, note: focus ? `Fixed manually: ${focus.title}` : "Edited manually" }) }],
   });
   if (!r) return;
   const res = await guard(() => api(`/api/content/${c.id}`, { method: "PUT", body: r }), "Saved as a new version");
-  if (res) { location.hash = `#/reports/${c.id}`; window.dispatchEvent(new HashChangeEvent("hashchange")); }
+  if (res) { location.hash = `#/reports/${c.id}?run=1`; window.dispatchEvent(new HashChangeEvent("hashchange")); }
 }
 
 function howScored(ctx) {

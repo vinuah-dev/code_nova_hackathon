@@ -15,6 +15,7 @@ export async function render(view, ctx) {
       <div class="sub">Brand health for <b>Voltaro Mobility</b> <span class="tag-demo">fictional demo org</span>. Seeded submissions were scored by the real rule engine.</div></div>
       <div class="actions"><a class="btn" href="#/intelligence">${icon("sparkles", "sm")} Brand Intelligence</a><a class="btn primary" href="#/studio/new">${icon("plus", "sm")} Review new content</a></div></div>
     ${startCard()}
+    ${inbox(ctx, list)}
     <div class="grid g6" style="margin-bottom:16px">
       ${kpi("gauge", "Avg. compliance", an.overall_score == null ? "—" : `${Math.round(an.overall_score)}<small>/100</small>`, `${an.reviewed} reviewed items`, "#/reports")}
       ${kpi("files", "Submissions", an.submissions, `${an.ai_share}% reviewed with AI`, "#/studio")}
@@ -65,6 +66,24 @@ export async function render(view, ctx) {
     }
     const tr = e.target.closest("tr[data-href]"); if (tr) location.hash = tr.dataset.href;
   };
+}
+
+// "Waiting on you": what this role should act on next, so nobody has to hunt through lists.
+function inbox(ctx, list) {
+  const role = ctx.me.role, me = ctx.me.id;
+  const fixStates = ["draft", "ai_review", "needs_revision", "rejected", "modified_after_approval"];
+  let items = [], why = "";
+  if (role === "creator") { items = list.filter((c) => c.owner_id === me && fixStates.includes(c.status)); why = "Your drafts that need fixes or submitting"; }
+  else if (role === "manager") { items = list.filter((c) => c.status === "pending_approval"); why = "Waiting for your review: endorse or request changes"; }
+  else if (role === "approver") { items = list.filter((c) => c.status === "pending_approval"); why = "Waiting for your final decision"; }
+  else { items = list.filter((c) => c.status === "pending_approval" || c.status === "modified_after_approval"); why = "Pending approvals and content changed after approval"; }
+  const action = (c) => role === "creator" ? (c.analysis_id ? "Fix and submit" : "Run review") : c.status === "modified_after_approval" ? "Re-review" : role === "manager" ? "Review" : "Decide";
+  return `<div class="card" style="margin-bottom:16px"><div class="card-h"><h2>${icon("inbox", "sm")} Waiting on you</h2><span class="pill indigo">${items.length}</span><span class="muted small right">${why}</span></div>
+    <div class="card-b">${items.length ? `<table class="t"><tbody>${items.slice(0, 6).map((c) => `<tr class="click" data-href="#/reports/${c.id}">
+      <td>${scoreBadge(c.score)}</td><td><b>${esc(c.title)}</b><div class="small muted">${esc(c.channel || "")} · ${esc(c.owner || "")}</div></td>
+      <td class="small"><span class="pill st-${c.status}">${esc(c.status_label)}</span></td><td class="right"><span class="btn sm">${action(c)} ${icon("arrow-right", "sm")}</span></td></tr>`).join("")}</tbody></table>
+      ${items.length > 6 ? `<div class="small muted" style="margin-top:6px">+ ${items.length - 6} more in <a href="#/reports">Compliance Reports</a></div>` : ""}`
+      : `<div class="empty small">${icon("check-circle-2")}<div>Nothing waiting on you right now.</div></div>`}</div></div>`;
 }
 
 const HIDE = "inkloom.start.hidden";

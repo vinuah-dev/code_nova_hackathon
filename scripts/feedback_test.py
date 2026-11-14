@@ -1,4 +1,4 @@
-"""Tests for in-app user-testing feedback, on a throwaway database.
+"""Tests for in-app user-testing feedback and the audit-log export, on a throwaway database.
 
 Run:  python scripts/feedback_test.py
 """
@@ -47,5 +47,9 @@ with TestClient(app) as c:
     check(csv.status_code == 200 and "Override step confusing" in csv.text and csv.text.startswith("id,"), "CSV export for the submission evidence")
     check(c.post("/api/admin/reset-demo", headers=H("u-admin")).status_code == 200, "demo data reset")
     check(c.get("/api/feedback", headers=H("u-admin")).json()["summary"]["count"] == 2, "feedback survives a demo reset")
+    c.cookies.clear()  # reset-demo signs the admin back in with a cookie; test the header roles below
+    audit = c.get("/api/audit.csv", headers=H("u-approver"))
+    check(audit.status_code == 200 and audit.text.startswith("at,content_id") and ",approved," in audit.text, "audit log CSV with approvals and SHA-256")
+    check(c.get("/api/audit.csv", headers=H("u-creator")).status_code == 403, "creators cannot export the audit log")
 
 print(f"\nAll {passed} feedback checks passed.")
