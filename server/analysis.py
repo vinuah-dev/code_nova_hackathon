@@ -24,6 +24,14 @@ def _locate(text: str, quote: str) -> tuple[int | None, int | None]:
     return (i, i + len(quote)) if i >= 0 else (None, None)
 
 
+# AI findings on these topics repeat a rule finding with this signature prefix, so they are dropped when it exists.
+_SAME_TOPIC = [
+    (r"\balt(?:ernative)?[- ]?text\b", "a11y:alt-"),
+    (r"\b(?:colou?r|palette)s?\b.*\b(?:unapproved|not (?:in|part of) the (?:approved )?palette|off[- ]brand|off[- ]palette)\b"
+     r"|\b(?:unapproved|off[- ]brand|off[- ]palette)\b.*\b(?:colou?r|palette)s?\b", "visual:color:"),
+]
+
+
 def _merge_ai(result: dict, texts: dict, rule_findings: list[dict], lookup: dict, images: list[dict]) -> list[dict]:
     out = []
     raw = result.get("findings") if isinstance(result, dict) else None
@@ -54,6 +62,9 @@ def _merge_ai(result: dict, texts: dict, rule_findings: list[dict], lookup: dict
             continue  # rule engine already covers this span
         if not images and f["category"] == "accessibility" and re.search(r"\balt(?:ernative)?[- ]?text\b", f.get("title", "") + " " + f.get("explanation", ""), re.I):
             continue  # no image in this content, so there is nothing to describe in alt text
+        about = (f.get("title", "") + " " + f.get("explanation", "")).lower()
+        if any(re.search(pat, about) and any((r.get("signature") or "").startswith(sig) for r in rule_findings) for pat, sig in _SAME_TOPIC):
+            continue  # the rule engine already reports this (e.g. missing alt text, off-palette colour)
         if target.startswith("image:"):
             q = (f.get("quote") or "").strip().lower()
             if q and any(r["target"] == target and r.get("ocr") and r["category"] == f["category"]
