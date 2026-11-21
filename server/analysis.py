@@ -62,6 +62,8 @@ def _merge_ai(result: dict, texts: dict, rule_findings: list[dict], lookup: dict
             continue  # rule engine already covers this span
         if not images and f["category"] == "accessibility" and re.search(r"\balt(?:ernative)?[- ]?text\b", f.get("title", "") + " " + f.get("explanation", ""), re.I):
             continue  # no image in this content, so there is nothing to describe in alt text
+        if f["title"].strip().lower() in {r["title"].lower() for r in rule_findings if r["target"] == target or target.startswith("image:") and r["target"].startswith("image:")}:
+            continue  # same issue the rule engine already reported on this part of the content
         about = (f.get("title", "") + " " + f.get("explanation", "")).lower()
         if any(re.search(pat, about) and any((r.get("signature") or "").startswith(sig) for r in rule_findings) for pat, sig in _SAME_TOPIC):
             continue  # the rule engine already reports this (e.g. missing alt text, off-palette colour)
