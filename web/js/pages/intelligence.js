@@ -178,10 +178,11 @@ function evalCard(e) {
             <tr><td>Brier (lower is better)</td><td><b>${L.model.brier.toFixed(3)}</b></td><td>${L.baseline.brier.toFixed(3)}</td></tr>
             <tr><td>AUC</td><td><b>${L.model.auc?.toFixed(3) ?? "–"}</b></td><td>${L.baseline.auc?.toFixed(3) ?? "–"}</td></tr>
             <tr><td>Accuracy</td><td><b>${pct(L.model.accuracy)}</b></td><td>${pct(L.baseline.accuracy)}</td></tr></tbody></table>
-            <div class="small muted" style="margin-top:6px">${L.n} findings (${L.false_alarms} false alarms), ${L.folds}-fold grouped cross-validation; ${L.passes_gate ? "it would pass" : "it would not pass"} the quality gate. Source: ${esc(L.source || "")}.</div>`
+            <div class="small muted" style="margin-top:6px">${L.n} findings (${L.false_alarms} false alarms), ${L.folds}-fold grouped cross-validation; ${L.passes_gate ? "it would pass" : "it would not pass"} the quality gate.${L.false_alarms < 10 ? ` With only ${L.false_alarms} false alarms this check is weak, so the model stays in shadow mode.` : ""} Source: ${esc(L.source || "")}.</div>`
             : `<div class="small muted">${esc(L?.status || "Not run yet")}.</div>`}
           <div class="small muted" style="margin-top:6px">In the product the model only changes scores after it also passes the gate on at least 20 <b>real</b> reviewer decisions; until then it stays in shadow mode.</div></div>
       </div>
+      ${e.engines["ai+rules"] ? `<div class="small muted" style="margin-top:10px">${icon("info", "sm")} Any finding that does not match a planted issue counts as a false alarm, even when it is a reasonable extra comment, so precision is a lower bound.${e.engines["ai+rules"].ai_unavailable_items ? ` The free AI tier was busy for ${e.engines["ai+rules"].ai_unavailable_items} of ${e.benchmark.posts} posts, which then used the rule engine only.` : ""}</div>` : ""}
       <div class="small muted" style="margin-top:10px">${icon("terminal", "sm")} Reproduce with <code>python scripts/evaluate.py --ai</code>; the labelled set is <code>scripts/eval_benchmark.json</code>.</div>
     </div></div>`;
 }
