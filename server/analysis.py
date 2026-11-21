@@ -1,7 +1,7 @@
 """Runs a full review: rules + retrieval + (optionally) the AI model, then scores."""
 import time
 
-from . import ai, config, db, learning, rag, rules, scoring
+from . import ai, config, db, lang, learning, rag, rules, scoring
 
 CATS = {"tone", "terminology", "claims", "facts", "visual", "accessibility"}
 SEVS = {"critical", "high", "medium", "low"}
@@ -65,6 +65,7 @@ def _merge_ai(result: dict, texts: dict, rule_findings: list[dict], lookup: dict
 
 def evaluate(body: str, alt_text: str, uploads: list[dict], allow_ai: bool = True) -> dict:
     """Pure evaluation (no storage). Used by reviews and the Brand DNA Simulator."""
+    language = lang.detect(" ".join([body or "", alt_text or ""]))
     rule_findings = rules.run(body, alt_text, uploads)
     for f in rule_findings:
         f["grounded"] = True
@@ -82,7 +83,7 @@ def evaluate(body: str, alt_text: str, uploads: list[dict], allow_ai: bool = Tru
         try:
             t_ai = time.monotonic()
             try:
-                res = ai.review(body, alt_text, pdf_text, images, logos, sources, rule_findings)
+                res = ai.review(body, alt_text, pdf_text, images, logos, sources, rule_findings, language)
             finally:
                 ai_ms = int((time.monotonic() - t_ai) * 1000)
             texts = {"body": body or "", "alt_text": alt_text or "", "pdf": pdf_text}
@@ -96,7 +97,7 @@ def evaluate(body: str, alt_text: str, uploads: list[dict], allow_ai: bool = Tru
         f["sources"] = [{"id": s, "title": lookup[s]["title"], "text": lookup[s]["text"], "type": lookup[s]["type"]}
                         for s in f.get("source_ids", []) if s in lookup]
     sc = scoring.score(findings)
-    return {"mode": mode, "note": note, "ai_error": err, "ai_ms": ai_ms, "findings": findings, "score": sc["overall"],
+    return {"mode": mode, "note": note, "ai_error": err, "ai_ms": ai_ms, "language": language, "findings": findings, "score": sc["overall"],
             "dimensions": sc["dimensions"], "retrieved": [{k: s[k] for k in ("id", "title", "type", "score")} for s in sources],
             "pdf_text": pdf_text}
 

@@ -14,7 +14,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
 
-from . import analysis, auth, config, db, extract, gaps, integrity, learning, policy, rag, scoring, storage, visual
+from . import analysis, auth, config, db, extract, lang, gaps, integrity, learning, policy, rag, scoring, storage, visual
 from .config import UPLOAD_DIR, WEB_DIR
 
 config.load_env()
@@ -58,6 +58,9 @@ def ensure_ready() -> None:
                 seed.set_demo_credentials()
             if not db.one("SELECT id FROM ml_models LIMIT 1"):
                 learning.train()  # existing databases from before feedback learning
+            from . import seed
+            with db.global_lock():
+                seed.ensure_language_pack()  # Hindi/Hinglish rules for databases seeded before Round 3
             _ready = True
 
 
@@ -502,7 +505,8 @@ def report(cid: int, version: int | None = None):
         if pa:
             prev = {"version": vnum - 1, "score": pa["score"], "dimensions": pa["dimensions"]}
     return {"content": _content_summary(c), "version": {**v, "attachments": [public_upload(x) for x in ups]},
-            "pdf_text": pdf_text, "analysis": a, "previous": prev}
+            "pdf_text": pdf_text, "analysis": a, "previous": prev,
+            "language": lang.detect(" ".join([v["body"] or "", v["alt_text"] or "", pdf_text[:4000]]))}
 
 
 @app.post("/api/analyses/{aid}/decisions")

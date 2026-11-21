@@ -196,6 +196,41 @@ def set_demo_credentials() -> None:
             db.ex("UPDATE users SET email=?, password_hash=? WHERE id=?", (email, auth.hash_password(DEMO_PASSWORD), uid))
 
 
+# Round 3: Hindi and Hinglish brand rules (suggestions stay in the same language and script).
+LANG_PROHIBITED = [
+    ("धमाका", "Firecracker slang; festive campaigns stay calm (G-VOICE-01).", "उत्सव", "medium", "tone", "G-VOICE-01"),
+    ("सस्ता", "Undermines our premium, dependable positioning.", "किफ़ायती", "medium", "tone", "G-VOICE-01"),
+    ("सस्ती", "Undermines our premium, dependable positioning.", "किफ़ायती", "medium", "tone", "G-VOICE-01"),
+    ("धांसू", "Slang; doesn't fit our calm, respectful voice.", "शानदार", "low", "tone", "G-VOICE-01"),
+    ("जल्दी करो", "Pressure selling conflicts with calm confidence.", "अभी बुक करें", "low", "tone", "G-VOICE-01"),
+    ("sasta", "Undermines our premium, dependable positioning.", "kifayti", "medium", "tone", "G-VOICE-01"),
+    ("dhaasu", "Slang; doesn't fit our calm, respectful voice.", "shaandaar", "low", "tone", "G-VOICE-01"),
+    ("jaldi karo", "Pressure selling conflicts with calm confidence.", "abhi book karein", "low", "tone", "G-VOICE-01"),
+    ("paisa vasool", "Bargain-bin slang; describe the concrete value instead.", "value for money", "low", "tone", "G-VOICE-01"),
+]
+LANG_FACT_KEYWORDS = {"F-RANGE": ["रेंज", "चार्ज", "किमी", "chale", "chalega"], "F-CHARGE": ["चार्ज", "charging"],
+                      "F-WARRANTY": ["वारंटी"], "F-SPEED": ["स्पीड", "रफ़्तार"]}
+
+
+def ensure_language_pack() -> int:
+    """Add the Hindi/Hinglish rules once (idempotent; works on databases seeded before Round 3)."""
+    added = 0
+    have = {r["phrase"].lower() for r in db.q("SELECT phrase FROM prohibited")}
+    for row in LANG_PROHIBITED:
+        if row[0].lower() not in have:
+            db.ex("INSERT INTO prohibited(phrase, reason, replacement, severity, category, guideline_id) VALUES (?,?,?,?,?,?)", row)
+            added += 1
+    for fid, extra in LANG_FACT_KEYWORDS.items():
+        f = db.one("SELECT keywords FROM facts WHERE id=?", (fid,))
+        if not f:
+            continue
+        kws = db.pj(f["keywords"], [])
+        new = [k for k in extra if k not in kws]
+        if new:
+            db.ex("UPDATE facts SET keywords=? WHERE id=?", (db.j(kws + new), fid))
+    return added
+
+
 def _add_asset(src, name, kind="logo"):
     dest = UPLOAD_DIR / f"brand_{src.name}"
     shutil.copy(src, dest)

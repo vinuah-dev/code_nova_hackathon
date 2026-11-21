@@ -203,10 +203,15 @@ def _call_anthropic(system: str, content: list, schema: dict, max_tokens: int) -
 
 
 def review(body: str, alt_text: str, pdf_text: str, images: list[dict], official_logos: list[dict],
-           sources: list[dict], rule_findings: list[dict]) -> dict:
+           sources: list[dict], rule_findings: list[dict], language: dict | None = None) -> dict:
     src = "\n".join(f"[{s['id']}] ({s['category']}) {s['title']}: {s['text']}" for s in sources)
     already = "\n".join(f"- {f['category']}: {f['title']} — \"{f.get('quote', '')}\"" for f in rule_findings) or "- none"
     content: list = [{"type": "text", "text": f"SOURCES (approved brand knowledge):\n{src}\n\nALREADY FOUND by the rule engine:\n{already}"}]
+    if language and language.get("code") != "en":
+        content.append({"type": "text", "text": (
+            f"LANGUAGE: the content is {language['label']}. Apply the same brand rules to Hindi and Hinglish wording "
+            "(superlatives, guarantees, slang, pressure selling). Write titles and explanations in English, but every "
+            "'replacement' must be in the same language and script as the quoted text.")})
     content.append({"type": "text", "text": f"CONTENT TO REVIEW\n\n<body>\n{body or ''}\n</body>\n\n<alt_text>\n{alt_text or ''}\n</alt_text>"
                                              + (f"\n\n<pdf>\n{pdf_text[:20000]}\n</pdf>" if pdf_text else "")})
     for im in images:

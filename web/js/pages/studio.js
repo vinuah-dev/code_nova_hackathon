@@ -109,6 +109,10 @@ const TYPES = {
   doc: { label: "Document", ic: "file-text", channel: "Press release", body: "Notes or summary (optional)", ph: "Optional: paste text, or upload the PDF on the right…", alt: false, files: true },
 };
 const SAMPLES = {
+  hi: { title: "Diwali post (Hindi)", channel: "Instagram",
+    body: "दिवाली धमाका! वोल्टारो Glide-S1 अब सबसे सस्ता इलेक्ट्रिक स्कूटर, एक चार्ज में 150 किमी की रेंज, 100% गारंटी के साथ!! यहाँ क्लिक करें और जल्दी करो।" },
+  hinglish: { title: "Diwali post (Hinglish)", channel: "Instagram",
+    body: "Diwali ka sabse best offer! Glide-S1 ab ek charge mein 150 km chalega, pakka guarantee ke saath!! Jaldi karo, yahan click karein. Dhaasu deal sirf 31 Oct 2025 tak." },
   ad: { title: "Year-end search ad", channel: "Search ads",
     body: "Voltaro S1: India's cheapest premium scooter. Unbeatable price, 150 km range and the lowest EMI, guaranteed. Hurry, offer valid till 31 Dec 2025!" },
   email: { title: "Festive offer email", channel: "Email", subject: "CRAZY DEAL on the Glide-S1!!!",
@@ -131,7 +135,7 @@ function renderNew(view, ctx, can) {
   ctype = TYPES[qs.get("type")] ? qs.get("type") : "post";
   view.innerHTML = `
     <div class="page-head"><div><h1>New content</h1><div class="sub">Pick what you are publishing, add it, and run the brand review. Nothing is published.</div></div>
-      <div class="actions"><button class="btn" id="sample">${icon("flask-conical", "sm")} <span id="sample-l">Try a sample</span></button></div></div>
+      <div class="actions"><button class="btn" id="sample-hi" title="Hindi (Devanagari) sample">${icon("languages", "sm")} हिंदी sample</button><button class="btn" id="sample-hg" title="Hinglish sample">${icon("languages", "sm")} Hinglish sample</button><button class="btn" id="sample">${icon("flask-conical", "sm")} <span id="sample-l">Try a sample</span></button></div></div>
     <div class="type-chips" id="types" role="tablist" aria-label="Content type">${Object.entries(TYPES).map(([k, t]) =>
       `<button class="chip ${k === ctype ? "on" : ""}" role="tab" aria-selected="${k === ctype}" data-type="${k}">${icon(t.ic, "sm")} ${t.label}</button>`).join("")}</div>
     <div class="split">
@@ -166,7 +170,10 @@ function renderNew(view, ctx, can) {
   $("#go").onclick = () => save(true);
   $("#types").onclick = (e) => { const b = e.target.closest("[data-type]"); if (b) setType(b.dataset.type); };
   setType(ctype);
-  if (qs.get("sample")) loadSample().then(() => { if (qs.get("run")) save(true); });
+  $("#sample-hi").onclick = () => loadSample("hi");
+  $("#sample-hg").onclick = () => loadSample("hinglish");
+  const sq = qs.get("sample");
+  if (sq) loadSample(["hi", "hinglish"].includes(sq) ? sq : undefined).then(() => { if (qs.get("run")) save(true); });
 }
 
 function setType(k) {
@@ -205,7 +212,15 @@ function paintFiles() {
   icons();
 }
 
-async function loadSample() {
+async function loadSample(lang) {
+  if (lang) {  // Hindi / Hinglish text samples (Round 3: multilingual checks)
+    setType("post");
+    files = []; paintFiles();
+    const s = SAMPLES[lang];
+    $("#t").value = s.title; $("#ch").value = s.channel; $("#b").value = s.body; $("#alt").value = ""; $("#subj").value = "";
+    toast(`${lang === "hi" ? "Hindi" : "Hinglish"} sample loaded: a fictional draft with deliberate brand mistakes`);
+    return;
+  }
   try {
     const get = async (n, type) => new File([await (await fetch(`/demo/${n}`)).blob()], n, { type });
     files = [];

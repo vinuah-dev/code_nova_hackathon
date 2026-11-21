@@ -57,7 +57,7 @@ export async function render(view, ctx) {
       if (t.dataset.try) {
         // One click: become the Creator, load a sample with deliberate mistakes and run the review.
         if (!ctx.status.permissions.create.includes(ctx.me.role)) await switchUser("u-creator");
-        location.hash = `#/studio/new?type=${t.dataset.try}&sample=1&run=1`;
+        location.hash = `#/studio/new?type=${t.dataset.try}&sample=${t.dataset.sample || 1}&run=1`;
       } else {
         await switchUser(t.dataset.goAs);
         location.hash = t.dataset.href;
@@ -94,7 +94,7 @@ function startCard() {
     <div class="card-b"><div class="start-steps">
       <div class="start-step"><span class="n">1</span><b>Submit content for review</b><span class="small muted">Pick a sample with deliberate brand mistakes. It is reviewed against the Brand Brain straight away.</span>
         <div class="acts"><button class="btn sm primary" data-try="ad">${icon("megaphone", "sm")} Ad</button><button class="btn sm" data-try="email">${icon("mail", "sm")} Email</button>
-        <button class="btn sm" data-try="post">${icon("image", "sm")} Poster</button><button class="btn sm" data-try="doc">${icon("file-text", "sm")} PDF</button></div></div>
+        <button class="btn sm" data-try="post">${icon("image", "sm")} Poster</button><button class="btn sm" data-try="doc">${icon("file-text", "sm")} PDF</button><button class="btn sm" data-try="post" data-sample="hi">${icon("languages", "sm")} हिंदी</button><button class="btn sm" data-try="post" data-sample="hinglish">${icon("languages", "sm")} Hinglish</button></div></div>
       <div class="start-step"><span class="n">2</span><b>Read why, fix it, submit</b><span class="small muted">Every issue shows the rule it breaks and a suggested correction. Accept or reject each, apply the fixes, then submit for approval.</span></div>
       <div class="start-step"><span class="n">3</span><b>A human approves</b><span class="small muted">Switch to the Approver to approve or reject. The approved version is sealed with SHA-256.</span>
         <div class="acts"><button class="btn sm" data-go-as="u-approver" data-href="#/approvals">${icon("stamp", "sm")} Approve as Vikram</button></div></div>

@@ -8,13 +8,14 @@ import re
 from datetime import date
 
 from . import db, storage, visual
+from .lang import B_LEFT, B_RIGHT
 
 ALLOWED_CAPS = {"EV", "IP67", "ARAI", "IDC", "BIS", "USB", "LED", "GPS", "KM", "T&C", "FAQ", "AI", "OTA", "ABS", "CBS", "EMI", "GST", "INR"}
 
 UNIT_ALIASES = {
-    "km": r"(?:km|kms|kilometres|kilometers)(?![/a-z])",
-    "min": r"(?:min|mins|minutes)\b",
-    "years": r"(?:years?|yrs?)\b",
+    "km": r"(?:km|kms|kilometres|kilometers|किमी|किलोमीटर)(?![/a-z])",
+    "min": r"(?:min|mins|minutes|मिनट)(?![a-z])",
+    "years": r"(?:years?|yrs?|साल|वर्ष)(?![a-z])",
     "km/h": r"(?:km/h|kmph|kph)\b",
     "%": r"%",
     "hours": r"(?:hours?|hrs?)\b",
@@ -23,6 +24,13 @@ UNIT_ALIASES = {
 
 # Claim triggers: superlatives, absolutes and guarantees.
 CLAIM_TRIGGERS = [
+    # Hinglish and Hindi first, so their suggestions stay in the writer's language and script.
+    (r"\bsabse\s+(?:best|accha|achha|acchi|badhiya|sasta|sasti|tez|fast)\b", "high", "bahut badhiya"),
+    (r"\bnumber\s?(?:1|ek)\b", "high", "popular"),
+    (r"\bpakka\s+guarantee\b", "critical", ""),
+    (B_LEFT + r"सबसे\s+(?:बेहतरीन|अच्छा|अच्छी|बढ़िया|सस्ता|सस्ती|तेज़|तेज)" + B_RIGHT, "high", "बढ़िया"),
+    (B_LEFT + r"(?:पक्की\s+)?गारंटी" + B_RIGHT, "critical", ""),
+    (B_LEFT + r"नंबर\s?(?:1|वन|एक)" + B_RIGHT, "high", "लोकप्रिय"),
     (r",?\s*\bbest[- ]in[- ]class\b", "high", ""),
     (r"\b(?:the |India's |the world's )?best\b", "high", "a great"),
     (r"\b(?:the |India's |the world's )?fastest\b", "high", "a quick"),
@@ -42,7 +50,7 @@ SEV_ORDER = {"critical": 0, "high": 1, "medium": 2, "low": 3}
 
 
 def _sentences(text: str):
-    for m in re.finditer(r"[^.!?\n]+[.!?]*", text):
+    for m in re.finditer(r"[^.!?\n।॥]+[.!?।॥]*", text):
         s = m.group(0)
         if s.strip():
             yield m.start(), m.end(), s
@@ -96,7 +104,7 @@ def check_text(text: str, target: str, b: Builder) -> None:
     for p in db.q("SELECT * FROM prohibited"):
         rep = p["replacement"] or ""
         lead = r"(?:\b(?:a|an) )?" if re.match(r"(?i)an? ", rep) else ""
-        for m in re.finditer(r"(?<!\w)" + lead + re.escape(p["phrase"]) + r"(?!\w)", text, flags=re.I):
+        for m in re.finditer(B_LEFT + lead + re.escape(p["phrase"]) + B_RIGHT, text, flags=re.I):
             if b.overlaps(target, m.start(), m.end()):
                 continue
             b.add(category=p["category"] or "tone", severity=p["severity"] or "medium",
@@ -160,14 +168,15 @@ def check_text(text: str, target: str, b: Builder) -> None:
                   source_ids=["G-CLAIM-01"],
                   suggestion=({"replacement": softer, "rationale": ("Removes the unsupported claim." if softer == "" else "Softens the claim so it no longer needs evidence.") + " Alternatively, add it to the Approved Claims register with evidence."}
                               if softer is not None else None),
-                  confidence=0.75, signature="claim:" + re.sub(r"^(?:the |india s |the world s )", "", re.sub(r"[^a-z0-9]+", " ", m.group(0).lower()).strip()))
+                  confidence=0.75, signature="claim:" + re.sub(r"^(?:the |india s |the world s )", "", re.sub(r"[^a-z0-9ऀ-ॿ]+", " ", m.group(0).lower()).strip()))
 
     # 5. Expired dates / offers
     this_year = date.today().year
-    for m in re.finditer(r"\b(?:valid|till|until|ends?|offer|launch(?:ing)?|available from)\b[^.\n]{0,40}?\b(20\d\d)\b", text, flags=re.I):
-        yr = int(m.group(1))
+    expiry = (r"\b(?:valid|till|until|ends?|offer|launch(?:ing)?|available from)\b[^.\n]{0,40}?\b(20\d\d)\b"
+              r"|[^.\n।]{0,25}?\b(20\d\d)\s+(?:tak|तक)" + B_RIGHT)  # Hinglish/Hindi: "31 Oct 2025 tak"
+    for m in re.finditer(expiry, text, flags=re.I):
+        yr = int(m.group(1) or m.group(2))
         if yr < this_year:
-            a, z = m.start(1), m.end(1)
             b.add(category="facts", severity="medium", title="Possibly expired date or offer",
                   quote=m.group(0), start=m.start(), end=m.end(), target=target,
                   explanation=f"This mentions {yr}, which is in the past. Expired offers or launch dates must be removed or updated.",
@@ -193,6 +202,14 @@ def check_text(text: str, target: str, b: Builder) -> None:
               confidence=0.85, signature="tone:all-caps")
 
     # 7. Text accessibility
+    for m in re.finditer(r"\b(?:yahan|yaha) click (?:karein|karo|kare|kijiye)\b|" + B_LEFT + r"यहा[ँं]? क्लिक कर(?:ें|ो|िए)", text, flags=re.I):
+        hindi = bool(re.search("[ऀ-ॿ]", m.group(0)))
+        b.add(category="accessibility", severity="medium", title="Non-descriptive link text",
+              quote=m.group(0), start=m.start(), end=m.end(), target=target,
+              explanation="Screen-reader users often navigate by links; 'click here' gives no context, in any language.",
+              source_ids=["G-A11Y-03"], suggestion={"replacement": "हमारी वेबसाइट देखें" if hindi else "website par details dekhein",
+                                                     "rationale": "Describe the destination instead of the action, in the same language."},
+              confidence=0.9, signature="a11y:click-here")
     for m in re.finditer(r"\bclick here\b", text, flags=re.I):
         b.add(category="accessibility", severity="medium", title="Non-descriptive link text",
               quote=m.group(0), start=m.start(), end=m.end(), target=target,

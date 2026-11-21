@@ -27,6 +27,7 @@ export async function render(view, ctx, { id }) {
           <h1>${esc(c.title)}</h1>${statusPill(c.status, c.status_label)}
           ${c.is_demo ? `<span class="tag-demo" title="Seeded fictional demo submission">Demo data</span>` : ""}
           ${c.confidential ? `<span class="pill" title="Never sent to external AI">${icon("lock", "sm")} Confidential</span>` : ""}
+          ${rep.language && rep.language.code !== "en" ? `<span class="pill indigo" title="Detected language; rules and suggestions follow it">${icon("languages", "sm")} ${esc(rep.language.label)}</span>` : ""}
         </div>
         <div class="sub row wrap">${esc(c.channel || "")} · by ${esc(c.owner || "")} ·
           <select class="select" id="ver" style="width:auto;padding:3px 8px;font-size:12.5px">
