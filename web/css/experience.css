@@ -118,9 +118,8 @@
   .page-head { margin-bottom: 14px; gap: 10px; }
   .page-head h1 { font-size: 21px; }
   .page-head .sub { font-size: 13px; }
-  .page-head .actions { margin-left: 0; width: 100%; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
-  .page-head .actions::-webkit-scrollbar { display: none; }
-  .page-head .actions .btn { flex: none; }
+  .page-head .actions { margin-left: 0; width: 100%; flex-wrap: wrap; }
+  .page-head .actions .btn { flex: 1 1 auto; justify-content: center; }
 
   /* Every multi-column grid collapses, except KPI tiles (2-up). Inline grid styles are overridden on purpose. */
   .view .grid, .view .split, .compare { grid-template-columns: minmax(0, 1fr) !important; }

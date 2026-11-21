@@ -172,7 +172,7 @@ function contentCard(rep, a) {
       <div class="doc" id="doc">${state.preview && rv.count ? rv.html : highlight(v.body || "", f, "body") || `<span class="muted">No text</span>`}</div>
       <div class="hr"></div>
       <div class="section-lbl">${icon("image", "sm")} Alt text</div>
-      <div class="doc" style="font-size:14px">${v.alt_text ? highlight(v.alt_text, f, "alt_text") : `<mark class="${f.some((x) => x.target === "alt_text" && x.decision !== "rejected") ? "high" : "low"}" data-f="${(f.find((x) => x.target === "alt_text") || {}).id || ""}"><i>No alt text provided</i></mark>`}</div>
+      <div class="doc" style="font-size:14px">${v.alt_text ? highlight(v.alt_text, f, "alt_text") : f.some((x) => x.target === "alt_text") ? `<mark class="${f.some((x) => x.target === "alt_text" && x.decision !== "rejected") ? "high" : "low"}" data-f="${f.find((x) => x.target === "alt_text").id}"><i>No alt text provided</i></mark>` : `<span class="muted"><i>None (not needed without an image)</i></span>`}</div>
       ${rep.pdf_text ? `<div class="hr"></div><details><summary class="section-lbl" style="cursor:pointer">${icon("file-type-2", "sm")} Text extracted from PDF (${rep.pdf_text.length} chars)</summary>
         <div class="doc" style="font-size:13px;max-height:340px;overflow:auto">${highlight(rep.pdf_text, f, "pdf")}</div></details>` : ""}
       ${imgs.length ? `<div class="hr"></div><div class="section-lbl">${icon("images", "sm")} Visual assets</div><div class="imgs">${imgs.map((im) => {
