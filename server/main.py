@@ -941,6 +941,16 @@ def feedback_tasks():
     return FEEDBACK_TASKS
 
 
+@app.get("/api/evaluation")
+def evaluation():
+    """Latest benchmark results (precision/recall per engine, learning-model check), from scripts/evaluate.py."""
+    p = Path(__file__).with_name("eval_results.json")
+    if not p.exists():
+        return {"available": False}
+    import json as _json
+    return {"available": True, **_json.loads(p.read_text(encoding="utf-8"))}
+
+
 @app.get("/api/learning")
 def learning_summary():
     return learning.summary()

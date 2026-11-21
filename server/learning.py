@@ -22,6 +22,7 @@ from . import db
 
 SEED_NOTE = "Seeded demo feedback"
 MIN_SAMPLES = 30
+MIN_REAL = 20  # the model may only influence scores once it is trained on real reviewer decisions, not seeded demo ones
 MIN_PER_CLASS = 5
 MIN_GROUPS = 4
 MIN_GAIN = 0.10  # model Brier must be ≥10% lower than the baseline's
@@ -156,6 +157,8 @@ def train() -> dict:
         reasons = []
         if n < MIN_SAMPLES:
             reasons.append(f"needs at least {MIN_SAMPLES} decisions (has {n})")
+        if info["real"] < MIN_REAL:
+            reasons.append(f"needs at least {MIN_REAL} real reviewer decisions, not seeded demo ones (has {info['real']})")
         if min(npos, n - npos) < MIN_PER_CLASS:
             reasons.append(f"needs at least {MIN_PER_CLASS} accepted and {MIN_PER_CLASS} rejected findings")
         if len(groups) < MIN_GROUPS:
@@ -244,7 +247,7 @@ def annotate(findings: list[dict], apply: bool = True) -> None:
 def summary() -> dict:
     m = current()
     out = {"model": m, "thresholds": {"min_samples": MIN_SAMPLES, "min_per_class": MIN_PER_CLASS,
-                                      "min_groups": MIN_GROUPS, "min_gain": MIN_GAIN}}
+                                      "min_groups": MIN_GROUPS, "min_gain": MIN_GAIN, "min_real": MIN_REAL}}
     if m and m.get("weights"):
         named = sorted(zip(m["vocab"], m["weights"]), key=lambda t: -abs(t[1]))
         out["signals"] = [{"feature": k, "label": _label(k), "weight": w} for k, w in named if k != "bias"][:10]

@@ -40,6 +40,11 @@ POSTS = [
     "Range of 110 km on the Glide S-1 makes weekend trips easy, and families across Pune and Mumbai have told us that they now plan short getaways around their scooter instead of the car. Amazing!",
     "With the Voltaro Fast Charger you can top up during lunch, and riders who use it at our experience centres say that it fits neatly into their day without ever needing to plan a long stop anywhere. Yes!",
     "New helmets for the VoltaroGlide S1 are in stores this week, and our accessory team designed them with extra ventilation for summer rides so that commuters stay cool and comfortable in the heat. Enjoy!",
+    "The Glide-S1 now ships with a new seat that our design team tested over many weeks on long rides through Bengaluru traffic so that riders of every height stay comfortable for the whole journey. Love it!",
+    "Weekend service camps for the GlideS1 return this month, and our technicians will check brakes, tyres and battery health for every rider who visits any of the participating experience centres near them. Join us!",
+    "Students in Hyderabad told us the Voltaro S1 makes it easy to reach early classes on time, because it starts instantly, parks in tiny spaces and costs very little to charge overnight at home. Brilliant!",
+    "Families in Pune say the Glide-S1 has replaced their second car for school runs and grocery trips, because it is quiet, easy to park and simple to charge in the building parking at night. So good!",
+    "Fleet partners using the Glide S-1 for deliveries report that riders finish more trips per shift, since charging during breaks and quick parking near customers saves several minutes on every order. Fantastic!",
 ]
 
 with TestClient(app, headers={"X-User-Id": "u-creator"}) as c:

@@ -1,0 +1,990 @@
+[
+ {
+  "id": "B001",
+  "text": "The battery pack is IP67 rated for dust and water resistance. Charge 0-80% in 50 minutes with the Voltaro FastCharger.",
+  "expected": []
+ },
+ {
+  "id": "B002",
+  "text": "Book a test ride at your nearest Voltaro Experience Centre.",
+  "expected": []
+ },
+ {
+  "id": "B003",
+  "text": "Plan your weekend rides with the Voltaro app.",
+  "expected": []
+ },
+ {
+  "id": "B004",
+  "text": "Charge 0-80% in 50 minutes with the Voltaro FastCharger.",
+  "expected": []
+ },
+ {
+  "id": "B005",
+  "text": "Book a test ride at your nearest Voltaro Experience Centre.",
+  "expected": []
+ },
+ {
+  "id": "B006",
+  "text": "Our service team is ready to help with your first ride. The Voltaro Glide S1 is designed for calm, everyday city rides.",
+  "expected": []
+ },
+ {
+  "id": "B007",
+  "text": "Book a test ride at your nearest Voltaro Experience Centre.",
+  "expected": []
+ },
+ {
+  "id": "B008",
+  "text": "The Voltaro Glide S1 is designed for calm, everyday city rides. Our service team is ready to help with your first ride.",
+  "expected": []
+ },
+ {
+  "id": "B009",
+  "text": "Charge 0-80% in 50 minutes with the Voltaro FastCharger.",
+  "expected": []
+ },
+ {
+  "id": "B010",
+  "text": "Our service team is ready to help with your first ride.",
+  "expected": []
+ },
+ {
+  "id": "B011",
+  "text": "Yahan click karein aur ride book karein. Charge 0-80% in 50 minutes with the Voltaro FastCharger.",
+  "expected": [
+   {
+    "category": "accessibility",
+    "quote": "Yahan click karein",
+    "semantic": false
+   }
+  ]
+ },
+ {
+  "id": "B012",
+  "text": "Our service team is ready to help with your first ride. Leave every other scooter in the dust. Book a test ride at your nearest Voltaro Experience Centre.",
+  "expected": [
+   {
+    "category": "claims",
+    "quote": "Leave every other scooter in the dust",
+    "semantic": true
+   }
+  ]
+ },
+ {
+  "id": "B013",
+  "text": "Get HUGE savings on accessories. Book a test ride at your nearest Voltaro Experience Centre. It charges 0-80% in 60 minutes.",
+  "expected": [
+   {
+    "category": "tone",
+    "quote": "HUGE",
+    "semantic": false
+   },
+   {
+    "category": "facts",
+    "quote": "60",
+    "semantic": false
+   }
+  ]
+ },
+ {
+  "id": "B014",
+  "text": "Charge 0-80% in 50 minutes with the Voltaro FastCharger. Saves you ₹50,000 every year on fuel. It is a petrol killer on two wheels. Dhaasu deal sirf is hafte. एक चार्ज में 150 किमी की रेंज पाइए।",
+  "expected": [
+   {
+    "category": "claims",
+    "quote": "Saves you ₹50,000 every year on fuel",
+    "semantic": true
+   },
+   {
+    "category": "tone",
+    "quote": "Dhaasu",
+    "semantic": false
+   },
+   {
+    "category": "facts",
+    "quote": "150",
+    "semantic": false
+   },
+   {
+    "category": "tone",
+    "quote": "petrol killer",
+    "semantic": false
+   }
+  ]
+ },
+ {
+  "id": "B015",
+  "text": "Charge 0-80% in 50 minutes with the Voltaro FastCharger. Our service team is ready to help with your first ride. Ride 110 km on a single charge. It is a cheap way to commute.",
+  "expected": [
+   {
+    "category": "tone",
+    "quote": "cheap",
+    "semantic": false
+   },
+   {
+    "category": "facts",
+    "quote": "110",
+    "semantic": false
+   }
+  ]
+ },
+ {
+  "id": "B016",
+  "text": "Plan your weekend rides with the Voltaro app. Ride 150 km on a single charge. Every scooter has a battery warranty of 5 years. Ride through the monsoon with confidence. Hurry, stocks are limited. Doctors recommend riding a Voltaro every day.",
+  "expected": [
+   {
+    "category": "tone",
+    "quote": "Hurry",
+    "semantic": false
+   },
+   {
+    "category": "claims",
+    "quote": "Doctors recommend riding a Voltaro",
+    "semantic": true
+   },
+   {
+    "category": "facts",
+    "quote": "150",
+    "semantic": false
+   },
+   {
+    "category": "facts",
+    "quote": "5",
+    "semantic": false
+   }
+  ]
+ },
+ {
+  "id": "B017",
+  "text": "Ride through the monsoon with confidence. Only losers still ride petrol bikes. Ride 150 km on a single charge. The Voltaro S1 handles city traffic with ease. Yahan click karein aur ride book karein.",
+  "expected": [
+   {
+    "category": "terminology",
+    "quote": "Voltaro S1",
+    "semantic": false
+   },
+   {
+    "category": "tone",
+    "quote": "Only losers still ride petrol bikes",
+    "semantic": true
+   },
+   {
+    "category": "facts",
+    "quote": "150",
+    "semantic": false
+   },
+   {
+    "category": "accessibility",
+    "quote": "Yahan click karein",
+    "semantic": false
+   }
+  ]
+ },
+ {
+  "id": "B018",
+  "text": "Ride through the monsoon with confidence. Grab this crazy deal today. The Voltaro Glide S1 is designed for calm, everyday city rides.",
+  "expected": [
+   {
+    "category": "tone",
+    "quote": "crazy deal",
+    "semantic": false
+   }
+  ]
+ },
+ {
+  "id": "B019",
+  "text": "The Voltaro Glide S1 is designed for calm, everyday city rides. Leave every other scooter in the dust. The safest scooter money can buy. Saves you ₹50,000 every year on fuel.",
+  "expected": [
+   {
+    "category": "claims",
+    "quote": "The safest scooter money can buy",
+    "semantic": true
+   },
+   {
+    "category": "claims",
+    "quote": "Leave every other scooter in the dust",
+    "semantic": true
+   },
+   {
+    "category": "claims",
+    "quote": "Saves you ₹50,000 every year on fuel",
+    "semantic": true
+   }
+  ]
+ },
+ {
+  "id": "B020",
+  "text": "You will never have to think about charging again. Every scooter has a battery warranty of 5 years. The Voltaro Glide S1 is designed for calm, everyday city rides. This is the fastest way to cross town. Charge 0-80% in 50 minutes with the Voltaro FastCharger.",
+  "expected": [
+   {
+    "category": "claims",
+    "quote": "fastest",
+    "semantic": false
+   },
+   {
+    "category": "claims",
+    "quote": "never have to think about charging again",
+    "semantic": true
+   },
+   {
+    "category": "facts",
+    "quote": "5",
+    "semantic": false
+   }
+  ]
+ },
+ {
+  "id": "B021",
+  "text": "दिवाली धमाका ऑफ़र आ गया है। Yeh sabse best scooter hai. The battery pack is IP67 rated for dust and water resistance. Plan your weekend rides with the Voltaro app.",
+  "expected": [
+   {
+    "category": "tone",
+    "quote": "धमाका",
+    "semantic": false
+   },
+   {
+    "category": "claims",
+    "quote": "sabse best",
+    "semantic": false
+   }
+  ]
+ },
+ {
+  "id": "B022",
+  "text": "Our service team is ready to help with your first ride. Reach a top speed of 80 km/h. Yahan click karein aur ride book karein. The Voltaro Glide S1 has a certified range of 120 km per charge. एक चार्ज में 150 किमी की रेंज पाइए।",
+  "expected": [
+   {
+    "category": "facts",
+    "quote": "80",
+    "semantic": false
+   },
+   {
+    "category": "facts",
+    "quote": "150",
+    "semantic": false
+   },
+   {
+    "category": "accessibility",
+    "quote": "Yahan click karein",
+    "semantic": false
+   }
+  ]
+ },
+ {
+  "id": "B023",
+  "text": "Savings are guaranteed for every rider. Charge 0-80% in 50 minutes with the Voltaro FastCharger. Book a test ride at your nearest Voltaro Experience Centre.",
+  "expected": [
+   {
+    "category": "claims",
+    "quote": "guaranteed",
+    "semantic": false
+   }
+  ]
+ },
+ {
+  "id": "B024",
+  "text": "Yeh sabse best scooter hai. Charge 0-80% in 50 minutes with the Voltaro FastCharger.",
+  "expected": [
+   {
+    "category": "claims",
+    "quote": "sabse best",
+    "semantic": false
+   }
+  ]
+ },
+ {
+  "id": "B025",
+  "text": "The Voltaro Glide S1 has a certified range of 120 km per charge. यह सबसे सस्ता स्कूटर नहीं, सबसे भरोसेमंद है। Dhaasu deal sirf is hafte. The Voltaro Glide S1 is designed for calm, everyday city rides.",
+  "expected": [
+   {
+    "category": "tone",
+    "quote": "सस्ता",
+    "semantic": false
+   },
+   {
+    "category": "tone",
+    "quote": "Dhaasu",
+    "semantic": false
+   }
+  ]
+ },
+ {
+  "id": "B026",
+  "text": "It charges 0-80% in 60 minutes. The Voltaro Glide S1 is designed for calm, everyday city rides. Saves you ₹50,000 every year on fuel. Yahan click karein aur ride book karein. दिवाली धमाका ऑफ़र आ गया है।",
+  "expected": [
+   {
+    "category": "claims",
+    "quote": "Saves you ₹50,000 every year on fuel",
+    "semantic": true
+   },
+   {
+    "category": "accessibility",
+    "quote": "Yahan click karein",
+    "semantic": false
+   },
+   {
+    "category": "tone",
+    "quote": "धमाका",
+    "semantic": false
+   },
+   {
+    "category": "facts",
+    "quote": "60",
+    "semantic": false
+   }
+  ]
+ },
+ {
+  "id": "B027",
+  "text": "हर खरीद पर गारंटी के साथ। This is the fastest way to cross town. Book a test ride at your nearest Voltaro Experience Centre.",
+  "expected": [
+   {
+    "category": "claims",
+    "quote": "गारंटी",
+    "semantic": false
+   },
+   {
+    "category": "claims",
+    "quote": "fastest",
+    "semantic": false
+   }
+  ]
+ },
+ {
+  "id": "B028",
+  "text": "Leave every other scooter in the dust. Book a test ride at your nearest Voltaro Experience Centre.",
+  "expected": [
+   {
+    "category": "claims",
+    "quote": "Leave every other scooter in the dust",
+    "semantic": true
+   }
+  ]
+ },
+ {
+  "id": "B029",
+  "text": "Ride 150 km on a single charge. Plan your weekend rides with the Voltaro app.",
+  "expected": [
+   {
+    "category": "facts",
+    "quote": "150",
+    "semantic": false
+   }
+  ]
+ },
+ {
+  "id": "B030",
+  "text": "Get HUGE savings on accessories. Doctors recommend riding a Voltaro every day. The battery pack is IP67 rated for dust and water resistance. Weekend rides feel amazing!! Plan your weekend rides with the Voltaro app.",
+  "expected": [
+   {
+    "category": "tone",
+    "quote": "!!",
+    "semantic": false
+   },
+   {
+    "category": "claims",
+    "quote": "Doctors recommend riding a Voltaro",
+    "semantic": true
+   },
+   {
+    "category": "tone",
+    "quote": "HUGE",
+    "semantic": false
+   }
+  ]
+ },
+ {
+  "id": "B031",
+  "text": "Ride through the monsoon with confidence. Charge 0-80% in 50 minutes with the Voltaro FastCharger. It is the best scooter in India. It charges 0-80% in 60 minutes. Ride 110 km on a single charge. Join the festive dhamaka at our showroom.",
+  "expected": [
+   {
+    "category": "tone",
+    "quote": "dhamaka",
+    "semantic": false
+   },
+   {
+    "category": "facts",
+    "quote": "110",
+    "semantic": false
+   },
+   {
+    "category": "claims",
+    "quote": "best",
+    "semantic": false
+   },
+   {
+    "category": "facts",
+    "quote": "60",
+    "semantic": false
+   }
+  ]
+ },
+ {
+  "id": "B032",
+  "text": "Pakka guarantee ke saath ghar le jao. The Voltaro Glide S1 is designed for calm, everyday city rides. Get HUGE savings on accessories.",
+  "expected": [
+   {
+    "category": "claims",
+    "quote": "pakka guarantee",
+    "semantic": false
+   },
+   {
+    "category": "tone",
+    "quote": "HUGE",
+    "semantic": false
+   }
+  ]
+ },
+ {
+  "id": "B033",
+  "text": "The Voltaro Glide S1 has a certified range of 120 km per charge. Switching is a no-brainer.",
+  "expected": [
+   {
+    "category": "tone",
+    "quote": "no-brainer",
+    "semantic": false
+   }
+  ]
+ },
+ {
+  "id": "B034",
+  "text": "Plan your weekend rides with the Voltaro app. Dhaasu deal sirf is hafte. Jaldi karo, offer limited hai.",
+  "expected": [
+   {
+    "category": "tone",
+    "quote": "Dhaasu",
+    "semantic": false
+   },
+   {
+    "category": "tone",
+    "quote": "Jaldi karo",
+    "semantic": false
+   }
+  ]
+ },
+ {
+  "id": "B035",
+  "text": "दिवाली धमाका ऑफ़र आ गया है। Charge 0-80% in 50 minutes with the Voltaro FastCharger. Get it at an unbeatable price this month.",
+  "expected": [
+   {
+    "category": "tone",
+    "quote": "धमाका",
+    "semantic": false
+   },
+   {
+    "category": "claims",
+    "quote": "unbeatable price",
+    "semantic": false
+   }
+  ]
+ },
+ {
+  "id": "B036",
+  "text": "Plan your weekend rides with the Voltaro app. Meet the GlideS1, built for busy streets. Ride through the monsoon with confidence.",
+  "expected": [
+   {
+    "category": "terminology",
+    "quote": "GlideS1",
+    "semantic": false
+   }
+  ]
+ },
+ {
+  "id": "B037",
+  "text": "Get HUGE savings on accessories. हर खरीद पर गारंटी के साथ। Weekend rides feel amazing!! The Voltaro Glide S1 has a certified range of 120 km per charge. Book a test ride at your nearest Voltaro Experience Centre.",
+  "expected": [
+   {
+    "category": "claims",
+    "quote": "गारंटी",
+    "semantic": false
+   },
+   {
+    "category": "tone",
+    "quote": "!!",
+    "semantic": false
+   },
+   {
+    "category": "tone",
+    "quote": "HUGE",
+    "semantic": false
+   }
+  ]
+ },
+ {
+  "id": "B038",
+  "text": "Ride through the monsoon with confidence. Click here to book a test ride. Expect unbeatable comfort on rough roads.",
+  "expected": [
+   {
+    "category": "accessibility",
+    "quote": "Click here",
+    "semantic": false
+   },
+   {
+    "category": "claims",
+    "quote": "unbeatable",
+    "semantic": false
+   }
+  ]
+ },
+ {
+  "id": "B039",
+  "text": "The safest scooter money can buy. Only losers still ride petrol bikes. Ride 110 km on a single charge. Ride through the monsoon with confidence.",
+  "expected": [
+   {
+    "category": "claims",
+    "quote": "The safest scooter money can buy",
+    "semantic": true
+   },
+   {
+    "category": "facts",
+    "quote": "110",
+    "semantic": false
+   },
+   {
+    "category": "tone",
+    "quote": "Only losers still ride petrol bikes",
+    "semantic": true
+   }
+  ]
+ },
+ {
+  "id": "B040",
+  "text": "दिवाली धमाका ऑफ़र आ गया है। जल्दी करो, स्टॉक सीमित है। The battery pack is IP67 rated for dust and water resistance. Ride 110 km on a single charge. Charge 0-80% in 50 minutes with the Voltaro FastCharger.",
+  "expected": [
+   {
+    "category": "facts",
+    "quote": "110",
+    "semantic": false
+   },
+   {
+    "category": "tone",
+    "quote": "धमाका",
+    "semantic": false
+   },
+   {
+    "category": "tone",
+    "quote": "जल्दी करो",
+    "semantic": false
+   }
+  ]
+ },
+ {
+  "id": "B041",
+  "text": "The battery pack is IP67 rated for dust and water resistance. It is the best scooter in India.",
+  "expected": [
+   {
+    "category": "claims",
+    "quote": "best",
+    "semantic": false
+   }
+  ]
+ },
+ {
+  "id": "B042",
+  "text": "Reach a top speed of 80 km/h. Yahan click karein aur ride book karein. It is the best scooter in India. Ride through the monsoon with confidence.",
+  "expected": [
+   {
+    "category": "claims",
+    "quote": "best",
+    "semantic": false
+   },
+   {
+    "category": "accessibility",
+    "quote": "Yahan click karein",
+    "semantic": false
+   },
+   {
+    "category": "facts",
+    "quote": "80",
+    "semantic": false
+   }
+  ]
+ },
+ {
+  "id": "B043",
+  "text": "Meet the GlideS1, built for busy streets. Our service team is ready to help with your first ride. Expect unbeatable comfort on rough roads.",
+  "expected": [
+   {
+    "category": "claims",
+    "quote": "unbeatable",
+    "semantic": false
+   },
+   {
+    "category": "terminology",
+    "quote": "GlideS1",
+    "semantic": false
+   }
+  ]
+ },
+ {
+  "id": "B044",
+  "text": "Dhaasu deal sirf is hafte. Switching is a no-brainer. यह सबसे सस्ता स्कूटर नहीं, सबसे भरोसेमंद है। Charge 0-80% in 50 minutes with the Voltaro FastCharger. Our service team is ready to help with your first ride.",
+  "expected": [
+   {
+    "category": "tone",
+    "quote": "no-brainer",
+    "semantic": false
+   },
+   {
+    "category": "tone",
+    "quote": "Dhaasu",
+    "semantic": false
+   },
+   {
+    "category": "tone",
+    "quote": "सस्ता",
+    "semantic": false
+   }
+  ]
+ },
+ {
+  "id": "B045",
+  "text": "It is the best scooter in India. Our service team is ready to help with your first ride. Ride through the monsoon with confidence. Dhaasu deal sirf is hafte.",
+  "expected": [
+   {
+    "category": "tone",
+    "quote": "Dhaasu",
+    "semantic": false
+   },
+   {
+    "category": "claims",
+    "quote": "best",
+    "semantic": false
+   }
+  ]
+ },
+ {
+  "id": "B046",
+  "text": "It is the best scooter in India. The battery pack is IP67 rated for dust and water resistance. The Voltaro Glide S1 has a certified range of 120 km per charge.",
+  "expected": [
+   {
+    "category": "claims",
+    "quote": "best",
+    "semantic": false
+   }
+  ]
+ },
+ {
+  "id": "B047",
+  "text": "Yahan click karein aur ride book karein. Ride through the monsoon with confidence.",
+  "expected": [
+   {
+    "category": "accessibility",
+    "quote": "Yahan click karein",
+    "semantic": false
+   }
+  ]
+ },
+ {
+  "id": "B048",
+  "text": "Yahan click karein aur ride book karein. Ride through the monsoon with confidence. Our service team is ready to help with your first ride.",
+  "expected": [
+   {
+    "category": "accessibility",
+    "quote": "Yahan click karein",
+    "semantic": false
+   }
+  ]
+ },
+ {
+  "id": "B049",
+  "text": "Jaldi karo, offer limited hai. Charge 0-80% in 50 minutes with the Voltaro FastCharger. The Voltaro S1 handles city traffic with ease. It charges 0-80% in 60 minutes.",
+  "expected": [
+   {
+    "category": "terminology",
+    "quote": "Voltaro S1",
+    "semantic": false
+   },
+   {
+    "category": "facts",
+    "quote": "60",
+    "semantic": false
+   },
+   {
+    "category": "tone",
+    "quote": "Jaldi karo",
+    "semantic": false
+   }
+  ]
+ },
+ {
+  "id": "B050",
+  "text": "You will never have to think about charging again. Ride through the monsoon with confidence. Doctors recommend riding a Voltaro every day. Jaldi karo, offer limited hai.",
+  "expected": [
+   {
+    "category": "claims",
+    "quote": "never have to think about charging again",
+    "semantic": true
+   },
+   {
+    "category": "tone",
+    "quote": "Jaldi karo",
+    "semantic": false
+   },
+   {
+    "category": "claims",
+    "quote": "Doctors recommend riding a Voltaro",
+    "semantic": true
+   }
+  ]
+ },
+ {
+  "id": "B051",
+  "text": "Ride through the monsoon with confidence. Switching is a no-brainer. The Voltaro Glide S1 has a certified range of 120 km per charge. Pakka guarantee ke saath ghar le jao.",
+  "expected": [
+   {
+    "category": "claims",
+    "quote": "pakka guarantee",
+    "semantic": false
+   },
+   {
+    "category": "tone",
+    "quote": "no-brainer",
+    "semantic": false
+   }
+  ]
+ },
+ {
+  "id": "B052",
+  "text": "The battery pack is IP67 rated for dust and water resistance. दिवाली धमाका ऑफ़र आ गया है। Charge 0-80% in 50 minutes with the Voltaro FastCharger.",
+  "expected": [
+   {
+    "category": "tone",
+    "quote": "धमाका",
+    "semantic": false
+   }
+  ]
+ },
+ {
+  "id": "B053",
+  "text": "एक चार्ज में 150 किमी की रेंज पाइए। Book a test ride at your nearest Voltaro Experience Centre. Ride 150 km on a single charge. Plan your weekend rides with the Voltaro app.",
+  "expected": [
+   {
+    "category": "facts",
+    "quote": "150",
+    "semantic": false
+   },
+   {
+    "category": "facts",
+    "quote": "150",
+    "semantic": false
+   }
+  ]
+ },
+ {
+  "id": "B054",
+  "text": "Reach a top speed of 80 km/h. Switching is a no-brainer. The battery pack is IP67 rated for dust and water resistance. It is the best scooter in India.",
+  "expected": [
+   {
+    "category": "claims",
+    "quote": "best",
+    "semantic": false
+   },
+   {
+    "category": "tone",
+    "quote": "no-brainer",
+    "semantic": false
+   },
+   {
+    "category": "facts",
+    "quote": "80",
+    "semantic": false
+   }
+  ]
+ },
+ {
+  "id": "B055",
+  "text": "Ride through the monsoon with confidence. Book a test ride at your nearest Voltaro Experience Centre. This is the fastest way to cross town. एक चार्ज में 150 किमी की रेंज पाइए।",
+  "expected": [
+   {
+    "category": "claims",
+    "quote": "fastest",
+    "semantic": false
+   },
+   {
+    "category": "facts",
+    "quote": "150",
+    "semantic": false
+   }
+  ]
+ },
+ {
+  "id": "B056",
+  "text": "It is a petrol killer on two wheels. Our service team is ready to help with your first ride. Ride 110 km on a single charge. Book a test ride at your nearest Voltaro Experience Centre. Get HUGE savings on accessories.",
+  "expected": [
+   {
+    "category": "tone",
+    "quote": "petrol killer",
+    "semantic": false
+   },
+   {
+    "category": "facts",
+    "quote": "110",
+    "semantic": false
+   },
+   {
+    "category": "tone",
+    "quote": "HUGE",
+    "semantic": false
+   }
+  ]
+ },
+ {
+  "id": "B057",
+  "text": "Ride through the monsoon with confidence. Offer valid till 31 Dec 2025. Plan your weekend rides with the Voltaro app.",
+  "expected": [
+   {
+    "category": "facts",
+    "quote": "2025",
+    "semantic": false
+   }
+  ]
+ },
+ {
+  "id": "B058",
+  "text": "Book a test ride at your nearest Voltaro Experience Centre. It charges 0-80% in 60 minutes. Ride 110 km on a single charge. The Voltaro Glide S1 is designed for calm, everyday city rides.",
+  "expected": [
+   {
+    "category": "facts",
+    "quote": "60",
+    "semantic": false
+   },
+   {
+    "category": "facts",
+    "quote": "110",
+    "semantic": false
+   }
+  ]
+ },
+ {
+  "id": "B059",
+  "text": "The battery pack is IP67 rated for dust and water resistance. Saves you ₹50,000 every year on fuel. एक चार्ज में 150 किमी की रेंज पाइए। Reach a top speed of 80 km/h.",
+  "expected": [
+   {
+    "category": "facts",
+    "quote": "80",
+    "semantic": false
+   },
+   {
+    "category": "facts",
+    "quote": "150",
+    "semantic": false
+   },
+   {
+    "category": "claims",
+    "quote": "Saves you ₹50,000 every year on fuel",
+    "semantic": true
+   }
+  ]
+ },
+ {
+  "id": "B060",
+  "text": "एक चार्ज में 150 किमी की रेंज पाइए। Top up at home with the Voltaro Fast Charger. Plan your weekend rides with the Voltaro app. Savings are guaranteed for every rider. The Voltaro Glide S1 is designed for calm, everyday city rides.",
+  "expected": [
+   {
+    "category": "terminology",
+    "quote": "Voltaro Fast Charger",
+    "semantic": false
+   },
+   {
+    "category": "claims",
+    "quote": "guaranteed",
+    "semantic": false
+   },
+   {
+    "category": "facts",
+    "quote": "150",
+    "semantic": false
+   }
+  ]
+ },
+ {
+  "id": "S01",
+  "text": "The Voltaro Glide S1 is designed for calm, everyday city rides. Leave every other scooter in the dust.",
+  "expected": [
+   {
+    "category": "claims",
+    "quote": "Leave every other scooter in the dust",
+    "semantic": true
+   }
+  ]
+ },
+ {
+  "id": "S02",
+  "text": "Book a test ride at your nearest Voltaro Experience Centre. Other brands' scooters break down all the time.",
+  "expected": [
+   {
+    "category": "tone",
+    "quote": "Other brands' scooters break down all the time",
+    "semantic": true
+   }
+  ]
+ },
+ {
+  "id": "S03",
+  "text": "The battery pack is IP67 rated for dust and water resistance. Doctors recommend riding a Voltaro every day.",
+  "expected": [
+   {
+    "category": "claims",
+    "quote": "Doctors recommend riding a Voltaro",
+    "semantic": true
+   }
+  ]
+ },
+ {
+  "id": "S04",
+  "text": "Charge 0-80% in 50 minutes with the Voltaro FastCharger. You will never have to think about charging again.",
+  "expected": [
+   {
+    "category": "claims",
+    "quote": "never have to think about charging again",
+    "semantic": true
+   }
+  ]
+ },
+ {
+  "id": "S05",
+  "text": "The Voltaro Glide S1 has a certified range of 120 km per charge. Free service for life with every scooter.",
+  "expected": [
+   {
+    "category": "claims",
+    "quote": "Free service for life",
+    "semantic": true
+   }
+  ]
+ },
+ {
+  "id": "S06",
+  "text": "Plan your weekend rides with the Voltaro app. The safest scooter money can buy.",
+  "expected": [
+   {
+    "category": "claims",
+    "quote": "The safest scooter money can buy",
+    "semantic": true
+   }
+  ]
+ },
+ {
+  "id": "S07",
+  "text": "Our service team is ready to help with your first ride. Only losers still ride petrol bikes.",
+  "expected": [
+   {
+    "category": "tone",
+    "quote": "Only losers still ride petrol bikes",
+    "semantic": true
+   }
+  ]
+ },
+ {
+  "id": "S08",
+  "text": "Ride through the monsoon with confidence. Saves you ₹50,000 every year on fuel.",
+  "expected": [
+   {
+    "category": "claims",
+    "quote": "Saves you ₹50,000 every year on fuel",
+    "semantic": true
+   }
+  ]
+ }
+]

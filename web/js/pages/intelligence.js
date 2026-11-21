@@ -6,11 +6,13 @@ const SAMPLE_B = "The Glide-S1 offers 150 km of range — the best in India!! Ch
 
 export async function render(view, ctx) {
   const qs = new URLSearchParams(location.hash.split("?")[1] || "");
-  const [insights, learn] = await Promise.all([api("/api/insights"), api("/api/learning")]);
+  const [insights, learn, evalr] = await Promise.all([api("/api/insights"), api("/api/learning"), api("/api/evaluation").catch(() => null)]);
   const admin = ctx.status.permissions.brand.includes(ctx.me.role);
   const open = insights.filter((i) => i.status === "open");
   view.innerHTML = `
     <div class="page-head"><div><h1>Brand Intelligence</h1><div class="sub">Learn from repeated mistakes, and see how an edit changes brand identity before it ships.</div></div></div>
+    ${evalCard(evalr)}
+    <div style="height:18px"></div>
     ${learningCard(learn, admin)}
     <div class="grid" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:start;margin-top:18px">
       <div class="stack">
@@ -147,5 +149,39 @@ function learningCard(L, admin) {
         </div>
       </div>
       ${info.seeded ? `<div class="banner info" style="margin-top:14px">${icon("info", "sm")}<div>${info.seeded} of the training decisions are <b>seeded demo feedback</b> on the fictional Voltaro archive (simulated reviewers who often reject "long sentence", "hashtag" and "exclamation" findings). Every accept/reject you make in a report is added, and the model retrains instantly.</div></div>` : ""}
+    </div></div>`;
+}
+
+// ---------------------------------------------------------------- Round 3: measured quality on a labelled benchmark
+function evalCard(e) {
+  if (!e || !e.available) return "";
+  const pct = (v) => v == null ? "–" : `${Math.round(v * 100)}%`;
+  const names = { rules: "Rule engine only", "ai+rules": "Full product (AI + rules)" };
+  const rows = Object.entries(names).filter(([k]) => e.engines[k]).map(([k, label]) => {
+    const r = e.engines[k];
+    return `<tr><td><b>${label}</b></td><td>${pct(r.precision)}</td><td>${pct(r.recall)}</td><td>${pct(r.f1)}</td>
+      <td>${pct(r.recall_by_kind?.keyword?.recall)}</td><td>${pct(r.recall_by_kind?.semantic?.recall)}</td><td>${r.findings} / ${r.missed}</td></tr>`;
+  }).join("");
+  const best = e.engines["ai+rules"] || e.engines.rules;
+  const langName = { en: "English", hi: "Hindi", hinglish: "Hinglish" };
+  const L = e.learning;
+  return `<div class="card"><div class="card-h wrap"><h2>${icon("gauge", "sm")} Measured quality</h2><span class="pill indigo">${e.benchmark.labelled_issues} labelled issues · ${e.benchmark.posts} posts</span><span class="muted small right">run ${esc(e.run_at)}</span></div>
+    <div class="card-b">
+      <p class="ink2" style="margin-top:0">How well Inkloom finds real brand issues, measured on a labelled benchmark: posts in English, Hindi and Hinglish with planted mistakes whose exact words are known, plus ${e.benchmark.clean_posts} clean posts to count false alarms. <b>Keyword</b> issues are ones a rule can match (wrong figures, banned words); <b>semantic</b> issues need judgement (implied claims, mocking competitors).</p>
+      <div style="overflow-x:auto"><table class="t keep"><thead><tr><th>Engine</th><th>Precision</th><th>Recall</th><th>F1</th><th>Recall: keyword</th><th>Recall: semantic</th><th>Findings / missed</th></tr></thead><tbody>${rows}</tbody></table></div>
+      <div class="compare" style="align-items:start;margin-top:12px">
+        <div><div class="section-lbl">By language (${best === e.engines["ai+rules"] ? "full product" : "rule engine"})</div>
+          <table class="t keep"><thead><tr><th>Language</th><th>Precision</th><th>Recall</th></tr></thead><tbody>
+          ${Object.entries(best.by_language || {}).map(([k, v]) => `<tr><td>${langName[k] || k}</td><td>${pct(v.precision)}</td><td>${pct(v.recall)}</td></tr>`).join("")}</tbody></table></div>
+        <div><div class="section-lbl">Learning model on labelled findings</div>
+          ${L && L.model ? `<table class="t keep"><thead><tr><th></th><th>Model</th><th>Engine confidence</th></tr></thead><tbody>
+            <tr><td>Brier (lower is better)</td><td><b>${L.model.brier.toFixed(3)}</b></td><td>${L.baseline.brier.toFixed(3)}</td></tr>
+            <tr><td>AUC</td><td><b>${L.model.auc?.toFixed(3) ?? "–"}</b></td><td>${L.baseline.auc?.toFixed(3) ?? "–"}</td></tr>
+            <tr><td>Accuracy</td><td><b>${pct(L.model.accuracy)}</b></td><td>${pct(L.baseline.accuracy)}</td></tr></tbody></table>
+            <div class="small muted" style="margin-top:6px">${L.n} findings (${L.false_alarms} false alarms), ${L.folds}-fold grouped cross-validation; ${L.passes_gate ? "it would pass" : "it would not pass"} the quality gate. Source: ${esc(L.source || "")}.</div>`
+            : `<div class="small muted">${esc(L?.status || "Not run yet")}.</div>`}
+          <div class="small muted" style="margin-top:6px">In the product the model only changes scores after it also passes the gate on at least 20 <b>real</b> reviewer decisions; until then it stays in shadow mode.</div></div>
+      </div>
+      <div class="small muted" style="margin-top:10px">${icon("terminal", "sm")} Reproduce with <code>python scripts/evaluate.py --ai</code>; the labelled set is <code>scripts/eval_benchmark.json</code>.</div>
     </div></div>`;
 }

@@ -8,6 +8,12 @@ The demo organisation is **Voltaro Mobility**, a *fictional* Indian electric-sco
 
 ---
 
+## Round 3: the three improvements we committed to
+
+1. **Text inside images (OCR) checked like body text.** `server/ocr.py` reads every line printed on a poster or creative with the vision model (Gemini), with a bounding box per line; the result is cached on the upload and never requested for confidential content. The same rules as for body text (facts, claims, banned phrases, names, tone, Hindi/Hinglish) run on that text, and the report draws each flagged region on the image. Tests: `scripts/ocr_test.py` (12 checks, stubbed vision model).
+2. **Hindi and Hinglish content checks.** `server/lang.py` detects English, Hindi (Devanagari), Hinglish (Hindi in Latin script) and mixed text. The Brand Brain gains Hindi/Hinglish claim triggers, slang, pressure selling, units and fact keywords, with Devanagari-safe word boundaries; suggestions stay in the writer's language and script, and the AI is told to do the same. Tests: `scripts/language_test.py` (14 checks).
+3. **An evaluated, trustworthy learning model.** `scripts/evaluate.py` builds a labelled benchmark (68 posts, 118 planted issues in English, Hindi and Hinglish, plus 10 clean posts) and reports precision, recall and F1 for the rule engine and the full product, split into keyword issues and semantic issues that need judgement. Every finding is then labelled correct or false alarm and the feedback-learning model is cross-validated on those labels against the engine's own confidence. Results are in `server/eval_results.json` and on the Brand Intelligence page. In the product the model may only change scores after passing its gate on at least 20 real reviewer decisions. Tests: `scripts/eval_test.py` (9 checks).
+
 ## Run it
 
 Requires Python 3.10+.
@@ -40,7 +46,7 @@ On Vercel, add the same variables under Project → Settings → Environment Var
 python scripts/smoke_test.py
 ```
 
-It runs 34 checks covering upload → review → fixes → approval → integrity → gap intelligence → analytics. `python scripts/mock_ai_test.py` runs 11 more against a local mock of an OpenAI-compatible AI server (request format, image input, grounding validation, fallback on 429). `python scripts/auth_test.py` runs 22 sign-in/sign-out checks with real cookies. `python scripts/feedback_test.py` runs 12 checks on in-app user-testing feedback and the audit-log export. `python scripts/extract_test.py` runs 13 checks on extracting rules from brand documents and the health endpoint. `python scripts/policy_bulk_test.py` runs 14 checks on the approval policy and bulk CSV review. `python scripts/learning_test.py` runs 14 checks on the feedback-learning model (shadow mode, quality gate, activation, admin pin).
+It runs 34 checks covering upload → review → fixes → approval → integrity → gap intelligence → analytics. `python scripts/mock_ai_test.py` runs 11 more against a local mock of an OpenAI-compatible AI server (request format, image input, grounding validation, fallback on 429). `python scripts/auth_test.py` runs 22 sign-in/sign-out checks with real cookies. `python scripts/feedback_test.py` runs 12 checks on in-app user-testing feedback and the audit-log export. `python scripts/extract_test.py` runs 13 checks on extracting rules from brand documents and the health endpoint. `python scripts/policy_bulk_test.py` runs 14 checks on the approval policy and bulk CSV review. `python scripts/learning_test.py` runs 14 checks on the feedback-learning model (shadow mode, quality gate, activation, admin pin). Round 3 adds `scripts/ocr_test.py` (12), `scripts/language_test.py` (14) and `scripts/eval_test.py` (9): 155 checks across 10 scripts. `python scripts/evaluate.py --ai` reproduces the benchmark numbers.
 
 ---
 
@@ -124,7 +130,10 @@ No templates or boilerplate were used. Demo images and the brand-book PDF are ge
 
 - Image checks are heuristic. Palette contrast uses the two dominant colours, not OCR'd text. The logo check compares the logo file the creator declares; it does not locate the logo inside a poster (Claude's vision covers that when enabled).
 - Rule-based rewrites are simple substitutions; better rewrites come from Claude when enabled.
-- Sign-in is email + password with server-side sessions, but there is no self-service sign-up, password reset or SSO, and the one-click demo accounts must be turned off (`INKLOOM_DEMO_LOGIN=0`) for any real use. Production also needs per-tenant isolation. The failed-login lockout is per server instance (in memory).
+- Sign-in is email + password with HMAC-signed session cookies, but there is no self-service sign-up, password reset or SSO, and the one-click demo accounts must be turned off (`INKLOOM_DEMO_LOGIN=0`) for any real use. Production also needs per-tenant isolation. The failed-login lockout is per server instance (in memory).
+- OCR uses the AI service: it is not available in rule-engine mode or for confidential content, and a busy free tier can delay it (the review then continues without image text and retries next time).
+- Hindi and Hinglish coverage is the rule set we wrote (claims, slang, pressure selling, units, 'click here', expiry) plus the AI; Hinglish spelling varies widely, so uncommon spellings may be missed. Other Indian languages are not covered.
+- The evaluation benchmark is synthetic: we planted the issues and wrote the clean posts. It measures what the engine catches against known answers, not accuracy on real customer content.
 - The integrity hash lives in the same database. Production should anchor it externally (e.g. a signed log).
 - The Gemini path has been run live (free tier, `gemini-3.5-flash`); the Anthropic path has not been exercised with a live key in this build. Model names on free tiers change often, so override `INKLOOM_MODEL` if a provider rejects the default.
 - The feedback-learning model is small and only as good as the decisions it gets. Its demo metrics come mostly from **simulated** seed feedback, so they show the mechanism, not real-world accuracy. Without `DATABASE_URL`, Vercel keeps the database in `/tmp`, so decisions (and the model) reset when an instance restarts; with Supabase they persist.
