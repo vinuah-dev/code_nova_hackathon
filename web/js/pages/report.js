@@ -178,11 +178,17 @@ function contentCard(rep, a) {
       ${imgs.length ? `<div class="hr"></div><div class="section-lbl">${icon("images", "sm")} Visual assets</div><div class="imgs">${imgs.map((im) => {
         const iss = f.filter((x) => x.target === `image:${im.id}` && x.decision !== "rejected");
         const worst = SEV.find((s) => iss.some((x) => x.severity === s));
-        return `<div class="img-card"><a href="${im.url}" target="_blank" rel="noopener"><img src="${im.url}" alt="${esc(im.name)}"></a>
+        const boxed = iss.filter((x) => x.box);
+        const ocr = im.meta?.ocr;
+        return `<div class="img-card"><div class="${boxed.length ? "ocr-wrap" : ""}"><a href="${im.url}" target="_blank" rel="noopener"><img src="${im.url}" alt="${esc(im.name)}"></a>
+          ${boxed.map((x) => `<a href="#" class="ocr-box ${x.severity}" data-goto="${x.id}" title="${esc(x.title)}: ${esc(x.quote || "")}" style="left:${x.box[0] * 100}%;top:${x.box[1] * 100}%;width:${(x.box[2] - x.box[0]) * 100}%;height:${(x.box[3] - x.box[1]) * 100}%"></a>`).join("")}</div>
           ${worst ? `<span class="flag">${sevPill(worst)}</span>` : `<span class="flag pill good">${icon("check", "sm")}</span>`}
           <div class="cap">${icon(im.kind === "logo" ? "badge" : "image", "sm")}<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(im.name)}</span><span class="muted right">${im.kind}</span></div>
           ${im.meta?.palette ? `<div class="swatches">${im.meta.palette.map((p) => `<span class="sw ${badHex.has(p.hex.toUpperCase()) ? "bad" : ""}" style="background:${p.hex}" title="${p.hex} · ${Math.round(p.share * 100)}%"></span>`).join("")}</div>` : ""}
           ${iss.length ? `<div class="small" style="padding:0 10px 10px">${iss.map((x) => `<a href="#" data-goto="${x.id}">${esc(x.title)}</a>`).join("<br>")}</div>` : ""}
+          ${ocr?.lines?.length ? `<details class="small" style="padding:0 10px 10px"><summary>${icon("scan-text", "sm")} Text read from the image (${ocr.lines.length} lines)</summary><div class="ink2" style="margin-top:4px">${ocr.lines.map((l) => esc(l.text)).join("<br>")}</div></details>`
+            : im.kind !== "logo" && ocr?.error ? `<div class="small muted" style="padding:0 10px 10px">${icon("scan-text", "sm")} Text in the image was not read: ${esc(ocr.error)}. Re-run the review to retry.</div>`
+            : im.kind !== "logo" && !ocr ? `<div class="small muted" style="padding:0 10px 10px">${icon("scan-text", "sm")} Text in the image is read by the AI service (not for confidential content or rule-engine mode).</div>` : ""}
         </div>`;
       }).join("")}</div>` : ""}
     </div></div>`;
@@ -221,7 +227,7 @@ function findingsCard(a, ctx) {
   const list = a.findings.filter((f) => state.filter === "all" || f.category === state.filter || (state.filter === "open" && !f.decision));
   const open = a.findings.filter((f) => !f.decision).length;
   return `<div class="card"><div class="card-h"><h2>${icon("list-checks", "sm")} Findings</h2><span class="muted small">${open} awaiting decision</span>
-      ${can(ctx, "decide_fix") && a.findings.some((f) => !f.decision && f.suggestion?.replacement != null && f.start != null) ? `<span class="right row" style="gap:6px"><button class="btn sm" data-accept-all>${icon("check-check", "sm")} Accept all text fixes</button>${can(ctx, "edit") ? `<button class="btn sm primary" data-accept-apply>${icon("wand-2", "sm")} Accept all & apply</button>` : ""}</span>` : ""}</div>
+      ${can(ctx, "decide_fix") && a.findings.some((f) => !f.decision && f.suggestion?.replacement != null && f.start != null && f.target === "body") ? `<span class="right row" style="gap:6px"><button class="btn sm" data-accept-all>${icon("check-check", "sm")} Accept all text fixes</button>${can(ctx, "edit") ? `<button class="btn sm primary" data-accept-apply>${icon("wand-2", "sm")} Accept all & apply</button>` : ""}</span>` : ""}</div>
     <div class="card-b">
       <div class="chips" style="margin-bottom:12px">
         <button class="chip ${state.filter === "all" ? "active" : ""}" data-filter="all">All ${a.findings.length}</button>
@@ -235,7 +241,7 @@ function findingsCard(a, ctx) {
 function finding(f, ctx) {
   const sug = f.suggestion;
   const canDecide = can(ctx, "decide_fix");
-  const hasRep = sug && sug.replacement != null && (f.start != null || f.target === "alt_text");
+  const hasRep = sug && sug.replacement != null && ["body", "alt_text"].includes(f.target) && (f.start != null || f.target === "alt_text");
   return `<div class="finding ${f.severity} ${f.decision ? "dec-" + f.decision : ""}" id="f-${f.id}" data-card="${f.id}">
     <div class="row wrap" style="gap:6px">${sevPill(f.severity)}<span class="pill">${icon(CAT_ICON[f.category] || "dot", "sm")} ${CAT[f.category] || f.category}</span>
       <span class="pill ${f.engine === "ai" ? "violet" : "indigo"}" title="${f.engine === "ai" ? "Found by the AI model, grounded in retrieved sources" : "Deterministic rule"}">${f.engine === "ai" ? "AI" : "Rule"}</span>
@@ -379,12 +385,12 @@ function wire(view, ctx, rep, detail) {
     }
     if (t.dataset.fixman) return editContent(rep, a.findings.find((f) => f.id === t.dataset.fixman));
     if (t.hasAttribute("data-accept-apply")) {
-      const todo = a.findings.filter((f) => !f.decision && f.suggestion?.replacement != null && f.start != null);
+      const todo = a.findings.filter((f) => !f.decision && f.suggestion?.replacement != null && f.start != null && f.target === "body");
       for (const f of todo) await api(`/api/analyses/${a.id}/decisions`, { method: "POST", body: { finding_id: f.id, decision: "accepted" } });
       return applyFixes(id, a);
     }
     if (t.hasAttribute("data-accept-all")) {
-      const todo = a.findings.filter((f) => !f.decision && f.suggestion?.replacement != null && f.start != null);
+      const todo = a.findings.filter((f) => !f.decision && f.suggestion?.replacement != null && f.start != null && f.target === "body");
       for (const f of todo) await api(`/api/analyses/${a.id}/decisions`, { method: "POST", body: { finding_id: f.id, decision: "accepted" } });
       toast(`${todo.length} fixes accepted. Review them, then apply.`, "ok");
       return reload();

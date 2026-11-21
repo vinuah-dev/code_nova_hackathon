@@ -340,3 +340,12 @@ button.more-tile { font: inherit; cursor: pointer; text-align: left; align-items
   .rise { animation: none !important; opacity: 1 !important; transform: none !important; }
   a { color: inherit; text-decoration: none; }
 }
+
+/* ---------- OCR boxes on images (Round 3) ---------- */
+.ocr-wrap { position: relative; }
+.ocr-wrap img { height: auto !important; }
+.ocr-box { position: absolute; border: 2px solid var(--critical); border-radius: 4px; background: rgba(196, 43, 50, .12); }
+.ocr-box.high { border-color: var(--high); background: rgba(217, 89, 11, .12); }
+.ocr-box.medium { border-color: var(--medium); background: rgba(168, 124, 0, .12); }
+.ocr-box.low { border-color: var(--low); background: rgba(91, 107, 140, .12); }
+.ocr-box:hover { box-shadow: 0 0 0 3px rgba(79, 70, 229, .35); }

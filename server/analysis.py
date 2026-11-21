@@ -1,7 +1,7 @@
 """Runs a full review: rules + retrieval + (optionally) the AI model, then scores."""
 import time
 
-from . import ai, config, db, lang, learning, rag, rules, scoring
+from . import ai, config, db, lang, learning, ocr, rag, rules, scoring
 
 CATS = {"tone", "terminology", "claims", "facts", "visual", "accessibility"}
 SEVS = {"critical", "high", "medium", "low"}
@@ -51,6 +51,11 @@ def _merge_ai(result: dict, texts: dict, rule_findings: list[dict], lookup: dict
             conf = round(conf * 0.6, 2)
         if start is not None and any(r["target"] == target and r["start"] is not None and r["start"] < end and start < r["end"] and r["category"] == f["category"] for r in rule_findings):
             continue  # rule engine already covers this span
+        if target.startswith("image:"):
+            q = (f.get("quote") or "").strip().lower()
+            if q and any(r["target"] == target and r.get("ocr") and r["category"] == f["category"]
+                         and (q in (r.get("quote") or "").lower() or (r.get("quote") or "").lower() in q) for r in rule_findings):
+                continue  # OCR + rules already flagged this text inside the image
         rep = (f.get("replacement") or "").strip()
         out.append({
             "id": f"A{n}", "engine": "ai", "category": f["category"], "severity": f["severity"], "title": f["title"],
@@ -65,7 +70,14 @@ def _merge_ai(result: dict, texts: dict, rule_findings: list[dict], lookup: dict
 
 def evaluate(body: str, alt_text: str, uploads: list[dict], allow_ai: bool = True) -> dict:
     """Pure evaluation (no storage). Used by reviews and the Brand DNA Simulator."""
-    language = lang.detect(" ".join([body or "", alt_text or ""]))
+    posters = [u for u in uploads if (u.get("mime") or "").startswith("image/") and u.get("kind") != "logo"]
+    if posters and allow_ai and config.ai_configured():
+        # OCR the creatives first (cached per upload) so their printed text gets the same rule checks.
+        from concurrent.futures import ThreadPoolExecutor
+        with ThreadPoolExecutor(max_workers=3) as pool:
+            list(pool.map(ocr.read, posters))
+    ocr_text = " ".join(ln["text"] for u in posters for ln in ((db.pj(u.get("meta"), {}) or {}).get("ocr") or {}).get("lines", []))
+    language = lang.detect(" ".join([body or "", alt_text or "", ocr_text]))
     rule_findings = rules.run(body, alt_text, uploads)
     for f in rule_findings:
         f["grounded"] = True

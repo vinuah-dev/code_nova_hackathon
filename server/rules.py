@@ -304,5 +304,23 @@ def run(body: str, alt_text: str, uploads: list[dict]) -> list[dict]:
     if pdf_text.strip():
         check_text(pdf_text, "pdf", b)
     check_images(uploads, alt_text or "", b)
+    # Round 3: text printed inside creatives (OCR, cached in the upload's meta) gets the same text checks.
+    from .ocr import box_for, text_and_index
+    for u in uploads:
+        if not (u.get("mime") or "").startswith("image/") or u.get("kind") == "logo":
+            continue
+        lines = ((db.pj(u.get("meta"), {}) or {}).get("ocr") or {}).get("lines") or []
+        if not lines:
+            continue
+        text, index = text_and_index(lines)
+        target = f"image:{u['id']}"
+        before = len(b.items)
+        check_text(text, target, b)
+        for f in b.items[before:]:
+            f["ocr"] = True
+            f["box"] = box_for(index, f.get("start"), f.get("end"))
+            f["explanation"] = f"Text printed inside the image '{u.get('name', '')}': " + f["explanation"]
+            if f.get("suggestion"):
+                f["suggestion"]["rationale"] = (f["suggestion"].get("rationale") or "") + " Change it in the design file and upload the new image."
     b.items.sort(key=lambda f: (SEV_ORDER.get(f["severity"], 9), f["start"] if f["start"] is not None else 10**9))
     return b.items

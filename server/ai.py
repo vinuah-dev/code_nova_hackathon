@@ -82,11 +82,11 @@ def _image_block(path: str) -> dict:
                                         "data": base64.standard_b64encode(buf.getvalue()).decode()}}
 
 
-def _call(system: str, content: list, schema: dict, max_tokens: int = 16000) -> dict:
+def _call(system: str, content: list, schema: dict, max_tokens: int = 16000, budget: float | None = None) -> dict:
     if not config.ai_configured():
         raise AIUnavailable("No AI provider configured")
     if config.provider() != "anthropic":
-        return _call_openai_compatible(system, content, schema, max_tokens)
+        return _call_openai_compatible(system, content, schema, max_tokens, budget)
     return _call_anthropic(system, content, schema, max_tokens)
 
 
@@ -104,7 +104,7 @@ def _extract_json(text: str) -> dict:
         raise AIUnavailable("AI returned invalid JSON") from e
 
 
-def _call_openai_compatible(system: str, content: list, schema: dict, max_tokens: int) -> dict:
+def _call_openai_compatible(system: str, content: list, schema: dict, max_tokens: int, budget: float | None = None) -> dict:
     """Gemini / Groq / OpenRouter / Ollama via the OpenAI-compatible /chat/completions API (stdlib only)."""
     import urllib.error
     import urllib.request
@@ -124,7 +124,7 @@ def _call_openai_compatible(system: str, content: list, schema: dict, max_tokens
     # again, all inside one time budget so a reviewer never waits minutes. Out of time = rule report.
     models = [config.model()] + [m for m in [config.fallback_model()] if m and m != config.model()]
     attempts = (models + models)[:3]
-    deadline = time.monotonic() + config.ai_budget_seconds()
+    deadline = time.monotonic() + (budget or config.ai_budget_seconds())
     data, last = None, None
     for i, model in enumerate(attempts):
         remaining = deadline - time.monotonic()
