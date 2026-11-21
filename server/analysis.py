@@ -1,4 +1,5 @@
 """Runs a full review: rules + retrieval + (optionally) the AI model, then scores."""
+import re
 import time
 
 from . import ai, config, db, lang, learning, ocr, rag, rules, scoring
@@ -51,6 +52,8 @@ def _merge_ai(result: dict, texts: dict, rule_findings: list[dict], lookup: dict
             conf = round(conf * 0.6, 2)
         if start is not None and any(r["target"] == target and r["start"] is not None and r["start"] < end and start < r["end"] and r["category"] == f["category"] for r in rule_findings):
             continue  # rule engine already covers this span
+        if not images and f["category"] == "accessibility" and re.search(r"\balt(?:ernative)?[- ]?text\b", f.get("title", "") + " " + f.get("explanation", ""), re.I):
+            continue  # no image in this content, so there is nothing to describe in alt text
         if target.startswith("image:"):
             q = (f.get("quote") or "").strip().lower()
             if q and any(r["target"] == target and r.get("ocr") and r["category"] == f["category"]

@@ -1,5 +1,5 @@
 {
- "run_at": "2026-11-21 17:07",
+ "run_at": "2026-11-21 17:08",
  "benchmark": {
   "posts": 68,
   "labelled_issues": 118,
@@ -56,26 +56,81 @@
      "recall": 0.0
     }
    }
+  },
+  "ai+rules": {
+   "precision": 0.669,
+   "recall": 0.924,
+   "f1": 0.776,
+   "findings": 163,
+   "correct": 109,
+   "missed": 9,
+   "by_language": {
+    "en": {
+     "precision": 0.621,
+     "recall": 0.885,
+     "f1": 0.73,
+     "findings": 87,
+     "correct": 54,
+     "missed": 7
+    },
+    "hinglish": {
+     "precision": 0.667,
+     "recall": 1.0,
+     "f1": 0.8,
+     "findings": 27,
+     "correct": 18,
+     "missed": 0
+    },
+    "hi": {
+     "precision": 0.755,
+     "recall": 0.949,
+     "f1": 0.841,
+     "findings": 49,
+     "correct": 37,
+     "missed": 2
+    }
+   },
+   "recall_by_kind": {
+    "keyword": {
+     "found": 94,
+     "total": 94,
+     "recall": 1.0
+    },
+    "semantic": {
+     "found": 15,
+     "total": 24,
+     "recall": 0.625
+    }
+   },
+   "ai_unavailable_items": 17
+  },
+  "ai_only": {
+   "precision": 0.217,
+   "recall": null,
+   "f1": null,
+   "findings": 69,
+   "correct": 15.0,
+   "missed": null
   }
  },
  "learning": {
-  "n": 107,
-  "false_alarms": 1,
+  "n": 163,
+  "false_alarms": 54,
   "folds": 5,
   "model": {
-   "brier": 0.0095,
-   "log_loss": 0.0963,
-   "accuracy": 0.9907,
-   "auc": 0.0943
+   "brier": 0.0181,
+   "log_loss": 0.0832,
+   "accuracy": 0.9816,
+   "auc": 0.9941
   },
   "baseline": {
-   "brier": 0.0312,
-   "log_loss": 0.169,
-   "accuracy": 0.9907,
-   "auc": 0.8538
+   "brier": 0.3205,
+   "log_loss": 1.1757,
+   "accuracy": 0.6687,
+   "auc": 0.0601
   },
-  "brier_gain": 0.696,
+  "brier_gain": 0.944,
   "passes_gate": true,
-  "source": "rule-engine findings on the benchmark"
+  "source": "findings from the full product (AI + rules) on the benchmark"
  }
 }
