@@ -214,6 +214,8 @@ def review(body: str, alt_text: str, pdf_text: str, images: list[dict], official
             "'replacement' must be in the same language and script as the quoted text.")})
     content.append({"type": "text", "text": f"CONTENT TO REVIEW\n\n<body>\n{body or ''}\n</body>\n\n<alt_text>\n{alt_text or ''}\n</alt_text>"
                                              + (f"\n\n<pdf>\n{pdf_text[:20000]}\n</pdf>" if pdf_text else "")})
+    if not images:
+        content.append({"type": "text", "text": "This content has no images, so do not raise alt-text or other image issues."})
     for im in images:
         content.append({"type": "text", "text": f"IMAGE in the content ({im['kind']}): {im['name']}"})
         content.append(_image_block(im["path"]))

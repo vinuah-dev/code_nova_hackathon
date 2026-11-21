@@ -198,6 +198,17 @@ def learning_eval(rows: list[dict]) -> dict:
             "passes_gate": bool(gain >= learning.MIN_GAIN and m["accuracy"] >= b["accuracy"])}
 
 
+def summary(r: dict) -> dict:
+    """Short record of an earlier full-product run, shown next to the latest one."""
+    a, lrn = r["engines"]["ai+rules"], r.get("learning") or {}
+    out = {"run_at": r.get("run_at"), "precision": a["precision"], "recall": a["recall"], "f1": a["f1"],
+           "findings": a["findings"], "false_alarms": a["findings"] - a["correct"], "ai_unavailable_items": a.get("ai_unavailable_items", 0)}
+    if lrn.get("model"):
+        out["learning"] = {"n": lrn["n"], "false_alarms": lrn["false_alarms"], "brier_model": lrn["model"]["brier"],
+                           "brier_engine": lrn["baseline"]["brier"], "auc_model": lrn["model"].get("auc"), "auc_engine": lrn["baseline"].get("auc")}
+    return out
+
+
 def main():
     db.conn()
     seed.seed()
@@ -211,7 +222,7 @@ def main():
     prev = json.loads(res_path.read_text(encoding="utf-8")) if res_path.exists() else {}
     results = {"run_at": time.strftime("%Y-%m-%d %H:%M"), "benchmark": {"posts": len(items), "labelled_issues": n_expected,
                "clean_posts": sum(1 for i in items if not i["expected"]), "languages": ["English", "Hindi", "Hinglish"]},
-               "engines": {}, "learning": prev.get("learning")}
+               "engines": {}, "learning": prev.get("learning"), "history": prev.get("history") or []}
     t = time.time()
     results["engines"]["rules"], rule_rows = run_engine(items, allow_ai=False)
     print("rules", results["engines"]["rules"], f"{time.time() - t:.1f}s")
@@ -222,6 +233,8 @@ def main():
         print("ai+rules", results["engines"]["ai+rules"], f"{time.time() - t:.1f}s")
         results["learning"] = learning_eval(rows)
         results["learning"]["source"] = "findings from the full product (AI + rules) on the benchmark"
+        if (prev.get("engines") or {}).get("ai+rules"):
+            results["history"] = [summary(prev)] + results["history"][:9]  # keep earlier full-product runs for comparison
     else:
         results["engines"].update({k: v for k, v in (prev.get("engines") or {}).items() if k != "rules"})
         if not results.get("learning"):

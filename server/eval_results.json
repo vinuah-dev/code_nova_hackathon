@@ -132,5 +132,25 @@
   "brier_gain": 0.419,
   "passes_gate": true,
   "source": "findings from the full product (AI + rules) on the benchmark"
- }
+ },
+ "history": [
+  {
+   "run_at": "2026-11-21 17:08",
+   "precision": 0.669,
+   "recall": 0.924,
+   "f1": 0.776,
+   "findings": 163,
+   "false_alarms": 54,
+   "ai_unavailable_items": 17,
+   "learning": {
+    "n": 163,
+    "false_alarms": 54,
+    "brier_model": 0.0181,
+    "brier_engine": 0.3205,
+    "auc_model": 0.9941,
+    "auc_engine": 0.0601
+   },
+   "note": "Before we stopped the AI from asking for alt text on posts that have no image."
+  }
+ ]
 }

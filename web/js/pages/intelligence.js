@@ -153,6 +153,19 @@ function learningCard(L, admin) {
 }
 
 // ---------------------------------------------------------------- Round 3: measured quality on a labelled benchmark
+function historyBlock(e, pct) {
+  const now = e.engines["ai+rules"];
+  if (!now || !(e.history || []).length) return "";
+  const fa = (r) => r.findings - r.correct;
+  const rows = e.history.map((h) => `<tr><td>${esc(h.run_at)}${h.note ? `<div class="small muted">${esc(h.note)}</div>` : ""}</td><td>${pct(h.precision)}</td><td>${pct(h.recall)}</td><td>${h.false_alarms}</td>
+      <td>${h.learning ? `${h.learning.brier_model.toFixed(3)} vs ${h.learning.brier_engine.toFixed(3)}` : "–"}</td></tr>`).join("");
+  const old = e.history.find((h) => h.learning && h.learning.false_alarms >= 10);
+  return `<div class="section-lbl" style="margin-top:14px">Run history (full product)</div>
+    <div style="overflow-x:auto"><table class="t keep"><thead><tr><th>Run</th><th>Precision</th><th>Recall</th><th>False alarms</th><th>Learning model Brier (model vs engine)</th></tr></thead><tbody>
+    <tr><td><b>${esc(e.run_at)}</b> (latest)</td><td><b>${pct(now.precision)}</b></td><td><b>${pct(now.recall)}</b></td><td><b>${fa(now)}</b></td><td>${e.learning?.model ? `${e.learning.model.brier.toFixed(3)} vs ${e.learning.baseline.brier.toFixed(3)}` : "–"}</td></tr>${rows}</tbody></table></div>
+    ${old ? `<div class="small muted" style="margin-top:6px">On the earlier run, with ${old.learning.false_alarms} false alarms to learn from, the model separated real issues from false alarms far better than the engine's own confidence (AUC ${old.learning.auc_model?.toFixed(2)} vs ${old.learning.auc_engine?.toFixed(2)}). After the fix there are too few false alarms left to measure it again, which is why it stays in shadow mode.</div>` : ""}`;
+}
+
 function evalCard(e) {
   if (!e || !e.available) return "";
   const pct = (v) => v == null ? "–" : `${Math.round(v * 100)}%`;
@@ -176,12 +189,13 @@ function evalCard(e) {
         <div><div class="section-lbl">Learning model on labelled findings</div>
           ${L && L.model ? `<table class="t keep"><thead><tr><th></th><th>Model</th><th>Engine confidence</th></tr></thead><tbody>
             <tr><td>Brier (lower is better)</td><td><b>${L.model.brier.toFixed(3)}</b></td><td>${L.baseline.brier.toFixed(3)}</td></tr>
-            <tr><td>AUC</td><td><b>${L.model.auc?.toFixed(3) ?? "–"}</b></td><td>${L.baseline.auc?.toFixed(3) ?? "–"}</td></tr>
+            ${L.false_alarms >= 10 ? `<tr><td>AUC</td><td><b>${L.model.auc?.toFixed(3) ?? "–"}</b></td><td>${L.baseline.auc?.toFixed(3) ?? "–"}</td></tr>` : ""}
             <tr><td>Accuracy</td><td><b>${pct(L.model.accuracy)}</b></td><td>${pct(L.baseline.accuracy)}</td></tr></tbody></table>
             <div class="small muted" style="margin-top:6px">${L.n} findings (${L.false_alarms} false alarms), ${L.folds}-fold grouped cross-validation; ${L.passes_gate ? "it would pass" : "it would not pass"} the quality gate.${L.false_alarms < 10 ? ` With only ${L.false_alarms} false alarms this check is weak, so the model stays in shadow mode.` : ""} Source: ${esc(L.source || "")}.</div>`
             : `<div class="small muted">${esc(L?.status || "Not run yet")}.</div>`}
           <div class="small muted" style="margin-top:6px">In the product the model only changes scores after it also passes the gate on at least 20 <b>real</b> reviewer decisions; until then it stays in shadow mode.</div></div>
       </div>
+      ${historyBlock(e, pct)}
       ${e.engines["ai+rules"] ? `<div class="small muted" style="margin-top:10px">${icon("info", "sm")} Any finding that does not match a planted issue counts as a false alarm, even when it is a reasonable extra comment, so precision is a lower bound.${e.engines["ai+rules"].ai_unavailable_items ? ` The free AI tier was busy for ${e.engines["ai+rules"].ai_unavailable_items} of ${e.benchmark.posts} posts, which then used the rule engine only.` : ""}</div>` : ""}
       <div class="small muted" style="margin-top:10px">${icon("terminal", "sm")} Reproduce with <code>python scripts/evaluate.py --ai</code>; the labelled set is <code>scripts/eval_benchmark.json</code>.</div>
     </div></div>`;
